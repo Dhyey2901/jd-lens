@@ -15,7 +15,13 @@ Paste any job description and a candidate profile — JD Lens extracts key signa
 
 ## Demo
 
-> _Add a screenshot of the running app here._
+**Input** — paste or upload a JD + resume (PDF, DOCX, TXT):
+
+![JD Lens — input screen](assets/screenshot_home.png)
+
+**Output** — fit score gauge, JD signals, colour-coded skill tags:
+
+![JD Lens — results screen](assets/screenshot_results.png)
 
 ---
 
