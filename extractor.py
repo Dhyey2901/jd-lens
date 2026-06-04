@@ -1,6 +1,7 @@
 """JD signal extraction using pure regex — no spaCy dependency."""
 from __future__ import annotations
 
+import logging
 import re
 
 from config import (
@@ -11,6 +12,8 @@ from config import (
     SOFT_SKILLS,
     WORK_TYPE_SIGNALS,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def extract_years_of_experience(text: str) -> list[str]:
@@ -73,7 +76,7 @@ def extract_industry(text: str) -> str:
 
 def extract_jd(jd_text: str) -> dict[str, object]:
     """Return all structured signals parsed from a raw job description."""
-    return {
+    result = {
         "skills_and_tools": extract_skills_and_tools(jd_text),
         "soft_skills": extract_soft_skills(jd_text),
         "years_of_experience": extract_years_of_experience(jd_text),
@@ -82,3 +85,9 @@ def extract_jd(jd_text: str) -> dict[str, object]:
         "work_type": extract_work_type(jd_text),
         "industry": extract_industry(jd_text),
     }
+    logger.info(
+        "Extracted JD: seniority=%s industry=%s skills=%d soft=%d",
+        result["seniority"], result["industry"],
+        len(result["skills_and_tools"]), len(result["soft_skills"]),
+    )
+    return result

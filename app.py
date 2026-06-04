@@ -113,13 +113,23 @@ def _gauge_chart(score: float) -> go.Figure:
     return fig
 
 
-def _skill_tags_html(matched: list[str], missing: list[str]) -> str:
+def _skill_tags_html(
+    matched: list[str],
+    semantic: list[str],
+    missing: list[str],
+) -> str:
     parts = []
     for s in matched:
         parts.append(
             f'<span style="background:#2ecc7118;color:#2ecc71;border:1px solid #2ecc7144;'
             f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;font-size:.82rem;">'
             f'✓ {s}</span>'
+        )
+    for s in semantic:
+        parts.append(
+            f'<span style="background:#f39c1218;color:#e67e22;border:1px solid #f39c1244;'
+            f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;font-size:.82rem;">'
+            f'≈ {s}</span>'
         )
     for s in missing:
         parts.append(
@@ -196,8 +206,10 @@ def _generate_recommendation(score_info: dict, jd_info: dict) -> str:
         verdict = "**Weak Fit.**"
         tone = "Significant gaps detected — this role may not be the right match at this stage."
 
+    semantic = score_info.get("semantic_skills", [])
     skill_line = (
-        f"Matches {len(matched)}/{total} required tools."
+        f"Exact match on {len(matched)}/{total} tools"
+        + (f", semantic match on {len(semantic)} more." if semantic else ".")
         if total else "No specific tools detected in JD."
     )
     gap_line = (
@@ -287,9 +299,16 @@ with tab_analyse:
 
     analyse = st.button("Analyse ✨", type="primary", use_container_width=True)
 
+    MAX_CHARS = 12_000
     if analyse:
         if not jd_text.strip() or not candidate_text.strip():
             st.error("Please provide both a job description and a candidate profile.")
+            st.stop()
+        if len(jd_text) > MAX_CHARS:
+            st.error(f"Job description exceeds {MAX_CHARS:,} characters. Please trim it.")
+            st.stop()
+        if len(candidate_text) > MAX_CHARS:
+            st.error(f"Candidate profile exceeds {MAX_CHARS:,} characters. Please trim it.")
             st.stop()
 
         with st.spinner("Loading models…"):
@@ -342,11 +361,25 @@ with tab_analyse:
         st.subheader("Skill Coverage")
         if jd_info["skills_and_tools"]:
             st.markdown(
-                _skill_tags_html(score_info["matched_skills"], score_info["missing_skills"]),
+                _skill_tags_html(
+                    score_info["matched_skills"],
+                    score_info.get("semantic_skills", []),
+                    score_info["missing_skills"],
+                ),
                 unsafe_allow_html=True,
             )
-            m, g = len(score_info["matched_skills"]), len(score_info["missing_skills"])
-            st.caption(f"✅ {m} matched &nbsp;·&nbsp; ❌ {g} missing &nbsp;·&nbsp; {m + g} total")
+            m = len(score_info["matched_skills"])
+            s = len(score_info.get("semantic_skills", []))
+            g = len(score_info["missing_skills"])
+            st.caption(
+                f"✅ {m} exact &nbsp;·&nbsp; ≈ {s} semantic &nbsp;·&nbsp; "
+                f"❌ {g} missing &nbsp;·&nbsp; {m + s + g} total"
+            )
+            if s:
+                st.caption(
+                    "≈ Semantic matches: candidate text is contextually related "
+                    "to the skill but doesn't use the exact term."
+                )
         else:
             st.info("No specific tools/skills detected in the JD.")
 

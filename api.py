@@ -1,6 +1,7 @@
 """FastAPI REST layer — exposes JD Lens analysis as a documented HTTP API."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import uvicorn
@@ -10,6 +11,8 @@ from pydantic import BaseModel, Field
 
 from extractor import extract_jd
 from scorer import compute_fit_score
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="JD Lens API",
@@ -37,12 +40,14 @@ class AnalyseRequest(BaseModel):
     jd_text: str = Field(
         ...,
         min_length=50,
+        max_length=12_000,
         description="Full text of the job description.",
         examples=["We are hiring a Senior Python Engineer with 5+ years of experience in AWS and Docker."],
     )
     candidate_text: str = Field(
         ...,
         min_length=20,
+        max_length=12_000,
         description="Candidate resume or profile summary.",
         examples=["6 years of Python, deployed microservices on AWS ECS, daily Docker and Kubernetes usage."],
     )
@@ -60,6 +65,7 @@ class JdSignals(BaseModel):
 
 class SkillAnalysis(BaseModel):
     matched: list[str]
+    semantic: list[str]
     missing: list[str]
     match_rate_pct: float
 
@@ -109,8 +115,11 @@ def analyse(req: AnalyseRequest) -> Any:
     fit = score_info["fit_score"]
     grade = "Strong Fit" if fit >= 65 else "Partial Fit" if fit >= 40 else "Weak Fit"
     matched = score_info["matched_skills"]
+    semantic = score_info.get("semantic_skills", [])
     missing = score_info["missing_skills"]
-    match_rate = round(len(matched) / max(len(jd_info["skills_and_tools"]), 1) * 100, 1)
+    total = max(len(jd_info["skills_and_tools"]), 1)
+    match_rate = round((len(matched) + 0.5 * len(semantic)) / total * 100, 1)
+    logger.info("API /analyse: fit=%.1f grade=%s", fit, grade)
 
     return AnalyseResponse(
         fit_score=fit,
@@ -127,6 +136,7 @@ def analyse(req: AnalyseRequest) -> Any:
         ),
         skill_analysis=SkillAnalysis(
             matched=matched,
+            semantic=semantic,
             missing=missing,
             match_rate_pct=match_rate,
         ),
