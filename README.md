@@ -4,16 +4,18 @@
 
 [![CI](https://github.com/Dhyey2901/jd-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/Dhyey2901/jd-lens/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B)](https://streamlit.io)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://jd-lens-ahnqxbthuw8t3tdr4mnuaw.streamlit.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Paste any job description and a candidate profile — JD Lens extracts key signals, classifies every sentence by intent, and scores candidate fit using a hybrid of **semantic embeddings**, **TF-IDF**, and **explicit skill matching**.
+
+**🚀 Live demo: [jd-lens-ahnqxbthuw8t3tdr4mnuaw.streamlit.app](https://jd-lens-ahnqxbthuw8t3tdr4mnuaw.streamlit.app/)**
 
 ---
 
 ## Demo
 
-> _Add a screenshot or screen recording here after first deploy._
+> _Add a screenshot of the running app here._
 
 ---
 
