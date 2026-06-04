@@ -58,6 +58,53 @@ WORK_TYPE_SIGNALS: dict[str, list[str]] = {
     "on-site": ["on-site", "onsite", "in-office", "in office"],
 }
 
+SOFT_SKILLS: list[str] = [
+    # Communication
+    "communication", "stakeholder management", "presentation skills",
+    "written communication", "verbal communication", "public speaking",
+    # Leadership
+    "leadership", "mentoring", "coaching", "people management", "team management",
+    # Analytical
+    "problem solving", "analytical thinking", "critical thinking",
+    "attention to detail", "data-driven",
+    # Collaboration
+    "collaboration", "teamwork", "cross-functional", "interpersonal skills",
+    # Project & Delivery
+    "project management", "planning", "prioritization", "time management",
+    # Adaptability & Drive
+    "adaptability", "self-starter", "initiative", "ownership", "fast-paced",
+    # Influence
+    "stakeholder", "influencing", "negotiation",
+]
+
+INDUSTRY_SIGNALS: dict[str, list[str]] = {
+    "fintech / finance": [
+        "banking", "fintech", "financial services", "trading", "investment",
+        "insurance", "payments", "lending", "wealth management", "capital markets",
+    ],
+    "healthcare": [
+        "healthcare", "medical", "clinical", "pharma", "biotech",
+        "health tech", "ehr", "fhir", "patient data",
+    ],
+    "e-commerce / retail": [
+        "e-commerce", "ecommerce", "retail", "marketplace", "consumer", "d2c", "omnichannel",
+    ],
+    "consulting": [
+        "consulting", "advisory", "management consulting", "professional services", "client-facing",
+    ],
+    "data / AI": [
+        "machine learning platform", "data science", "analytics platform",
+        "artificial intelligence", "ai/ml", "mlops", "data platform",
+    ],
+    "saas / tech": [
+        "saas", "enterprise software", "cloud platform", "startup", "scale-up", "b2b saas",
+    ],
+    "government / public sector": [
+        "government", "public sector", "federal", "defence", "defense", "civic tech",
+    ],
+    "education": ["edtech", "higher education", "academic research", "university"],
+}
+
 KNOWN_TOOLS: list[str] = [
     # Languages
     "python", "java", "javascript", "typescript", "go", "golang", "rust",
