@@ -559,47 +559,154 @@ with tab_compare:
                 results.append({
                     "name": name,
                     "fit_score": s["fit_score"],
-                    "matched_count": len(s["matched_skills"]),
-                    "missing_count": len(s["missing_skills"]),
-                    "top_missing": s["missing_skills"][:3],
+                    "grade": _score_grade(s["fit_score"]),
+                    "matched": s["matched_skills"],
+                    "semantic": s.get("semantic_skills", []),
+                    "missing": s["missing_skills"],
                     "breakdown": s["score_breakdown"],
                 })
 
         results.sort(key=lambda r: r["fit_score"], reverse=True)
+        winner = results[0]
+        all_jd_skills = jd_info_compare["skills_and_tools"]
 
         st.divider()
         medals = ["🥇", "🥈", "🥉"]
+        decision_colors = ["#2ecc71", "#e74c3c", "#e74c3c"]
+        decision_labels = ["SELECTED", "NOT SELECTED", "NOT SELECTED"]
 
+        # ── Per-candidate cards ────────────────────────────────────────────────
         for rank, r in enumerate(results):
-            color = _score_color(r["fit_score"])
-            c1, c2, c3, c4, c5 = st.columns([0.5, 2.5, 1.5, 2, 2.5])
-            c1.markdown(f"## {medals[rank]}")
-            c2.markdown(f"### {r['name']}")
-            c3.markdown(
-                f"<span style='color:{color};font-size:2.2rem;font-weight:800'>"
-                f"{r['fit_score']}%</span>",
+            score_color = _score_color(r["fit_score"])
+            dec_color = decision_colors[rank]
+            dec_label = decision_labels[rank]
+            gap_from_winner = winner["fit_score"] - r["fit_score"]
+
+            # Decision banner
+            st.markdown(
+                f"""<div style="border-left:5px solid {dec_color};
+                    padding:14px 18px;border-radius:6px;
+                    background:{dec_color}0d;margin-bottom:4px;">
+                  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:1.6rem;">{medals[rank]}</span>
+                    <span style="font-size:1.25rem;font-weight:700;">{r['name']}</span>
+                    <span style="font-size:1.8rem;font-weight:800;color:{score_color};">{r['fit_score']}%</span>
+                    <span style="font-size:.85rem;color:{score_color};">{r['grade']}</span>
+                    <span style="margin-left:auto;font-size:.8rem;font-weight:700;
+                        color:{dec_color};text-transform:uppercase;letter-spacing:.06em;">
+                        {dec_label}</span>
+                  </div>
+                </div>""",
                 unsafe_allow_html=True,
             )
-            c4.markdown(
-                f"✅ **{r['matched_count']}** matched  \n"
-                f"❌ **{r['missing_count']}** missing"
-            )
-            gaps = ", ".join(f"`{g}`" for g in r["top_missing"]) if r["top_missing"] else "—"
-            c5.markdown(f"**Key gaps:** {gaps}")
 
-        # Comparison bar chart
+            # Detail columns
+            dc1, dc2, dc3 = st.columns([2, 2, 3])
+
+            with dc1:
+                st.markdown("**Score breakdown**")
+                for dim, val in r["breakdown"].items():
+                    bar_color = _score_color(val)
+                    st.markdown(
+                        f"<div style='font-size:.8rem;margin-bottom:4px;'>"
+                        f"<span style='color:#666;'>{dim}</span>"
+                        f"<span style='float:right;font-weight:600;color:{bar_color};'>{val}%</span>"
+                        f"</div>"
+                        f"<div style='background:#eee;border-radius:4px;height:6px;margin-bottom:8px;'>"
+                        f"<div style='background:{bar_color};width:{min(val,100)}%;height:6px;border-radius:4px;'>"
+                        f"</div></div>",
+                        unsafe_allow_html=True,
+                    )
+
+            with dc2:
+                st.markdown("**Skill coverage**")
+                m, s_sem, miss = len(r["matched"]), len(r["semantic"]), len(r["missing"])
+                total = max(len(all_jd_skills), 1)
+                st.markdown(
+                    f"✅ **{m}** exact &nbsp; ≈ **{s_sem}** semantic &nbsp; ❌ **{miss}** missing  \n"
+                    f"Coverage: **{round((m + 0.5*s_sem)/total*100)}%** of {total} JD skills"
+                )
+                if r["missing"]:
+                    st.markdown(
+                        "**Missing skills:**  \n"
+                        + "  \n".join(f"&nbsp;&nbsp;`{sk}`" for sk in r["missing"])
+                    )
+
+            with dc3:
+                st.markdown("**Selection reasoning**")
+                if rank == 0:
+                    strengths = r["matched"][:3]
+                    st.success(
+                        f"Highest overall fit. Covers {m}/{total} required skills. "
+                        + (f"Key strengths: {', '.join(strengths)}." if strengths else "")
+                    )
+                else:
+                    reasons = []
+                    if gap_from_winner >= 20:
+                        reasons.append(f"score is {gap_from_winner:.0f} pts below top pick")
+                    extra_missing = [sk for sk in r["missing"] if sk in winner["matched"]]
+                    if extra_missing:
+                        reasons.append(
+                            f"missing {len(extra_missing)} skill(s) the top pick has: "
+                            f"{', '.join(extra_missing[:3])}"
+                        )
+                    if r["breakdown"]["Skill Match Rate"] < winner["breakdown"]["Skill Match Rate"] - 10:
+                        reasons.append("lower skill match rate")
+                    if r["breakdown"]["Semantic Similarity"] < winner["breakdown"]["Semantic Similarity"] - 10:
+                        reasons.append("weaker alignment to JD language")
+                    if reasons:
+                        st.error("Not selected — " + "; ".join(reasons) + ".")
+                    else:
+                        st.warning(
+                            f"Close call — only {gap_from_winner:.1f} pts behind. "
+                            "Consider interviewing if top pick declines."
+                        )
+
+            st.markdown("<hr style='border:none;border-top:1px solid #eee;margin:12px 0;'>",
+                        unsafe_allow_html=True)
+
+        # ── Skill comparison matrix ────────────────────────────────────────────
+        if all_jd_skills:
+            st.subheader("Skill Comparison Matrix")
+            st.caption("Shows how each candidate covers every required skill from the JD.")
+
+            header = "| Skill | " + " | ".join(r["name"] for r in results) + " |"
+            sep    = "|---|" + "---|" * len(results)
+            rows = []
+            for skill in all_jd_skills:
+                cells = []
+                for r in results:
+                    if skill in r["matched"]:
+                        cells.append("✅ Exact")
+                    elif skill in r["semantic"]:
+                        cells.append("≈ Semantic")
+                    else:
+                        cells.append("❌ Missing")
+                rows.append(f"| `{skill}` | " + " | ".join(cells) + " |")
+
+            st.markdown("\n".join([header, sep] + rows))
+
+        # ── Score comparison chart ─────────────────────────────────────────────
         st.subheader("Score Comparison")
-        fig = go.Figure(go.Bar(
-            x=[r["name"] for r in results],
-            y=[r["fit_score"] for r in results],
-            marker_color=[_score_color(r["fit_score"]) for r in results],
-            text=[f"{r['fit_score']}%" for r in results],
-            textposition="outside",
-        ))
+
+        dims = list(results[0]["breakdown"].keys())
+        fig = go.Figure()
+        dim_colors = ["#3498db", "#e67e22", "#2ecc71"]
+        for di, dim in enumerate(dims):
+            fig.add_trace(go.Bar(
+                name=dim,
+                x=[r["name"] for r in results],
+                y=[r["breakdown"][dim] for r in results],
+                marker_color=dim_colors[di],
+                text=[f"{r['breakdown'][dim]}%" for r in results],
+                textposition="inside",
+            ))
         fig.update_layout(
-            yaxis=dict(range=[0, 110], title="Fit Score (%)"),
-            height=300,
-            margin=dict(l=10, r=10, t=10, b=10),
+            barmode="group",
+            yaxis=dict(range=[0, 110], title="Score (%)"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=320,
+            margin=dict(l=10, r=10, t=30, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
         )
