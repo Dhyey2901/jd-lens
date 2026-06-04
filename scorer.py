@@ -42,7 +42,8 @@ def _tfidf_similarity(text_a: str, text_b: str) -> float:
 
 
 def _tokenize(text: str) -> set[str]:
-    return set(re.findall(r"\b[a-z][a-z0-9+#.\-]{2,}\b", text.lower()))
+    # (?<!\w) instead of \b so special-char tokens like c++ and node.js are matched correctly.
+    return set(re.findall(r"(?<!\w)[a-z][a-z0-9+#.\-]+", text.lower()))
 
 
 def compute_fit_score(
