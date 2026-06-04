@@ -11,7 +11,7 @@ from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
 from extractor import extract_jd
 from scorer import compute_fit_score, get_embedding_model
-from utils import extract_text_from_pdf
+from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
 
 # ── Sample data ────────────────────────────────────────────────────────────────
 
@@ -227,6 +227,42 @@ def _generate_recommendation(score_info: dict, jd_info: dict) -> str:
     return " ".join(parts)
 
 
+# ── Shared upload helper ───────────────────────────────────────────────────────
+
+def _handle_upload(
+    label: str,
+    session_key: str,
+    uploader_key: str,
+) -> None:
+    """Render a file uploader, extract text, and store it in session_state."""
+    uploaded = st.file_uploader(
+        label,
+        type=SUPPORTED_TYPES,
+        label_visibility="collapsed",
+        key=uploader_key,
+    )
+    if uploaded is not None:
+        try:
+            text = extract_text_from_file(uploaded.read(), uploaded.name)
+            if text:
+                st.session_state[session_key] = text
+                word_count = len(text.split())
+                ext = uploaded.name.rsplit(".", 1)[-1].upper()
+                st.success(f"Extracted {word_count:,} words from **{uploaded.name}** ({ext})")
+                with st.expander("Preview extracted text", expanded=False):
+                    st.text(text[:1500] + ("…" if len(text) > 1500 else ""))
+            else:
+                st.warning(
+                    "No text found in this file. "
+                    "PDFs with scanned images need OCR — try copying the text manually, "
+                    "or use a DOCX/TXT version for best results."
+                )
+        except ValueError as e:
+            st.error(str(e))
+        except Exception as e:
+            st.error(f"Could not read file: {e}")
+
+
 # ── Header ─────────────────────────────────────────────────────────────────────
 
 st.title("🔍 JD Lens")
@@ -271,27 +307,10 @@ with tab_analyse:
 
     with col_cand:
         st.subheader("Candidate Profile")
-        st.caption("Paste a resume or LinkedIn summary — or upload a PDF to extract it automatically.")
-
-        uploaded_pdf = st.file_uploader(
-            "Upload resume PDF",
-            type=["pdf"],
-            label_visibility="collapsed",
-            key="resume_upload",
-        )
-        if uploaded_pdf is not None:
-            try:
-                extracted = extract_text_from_pdf(uploaded_pdf.read())
-                if extracted:
-                    st.session_state["candidate_text"] = extracted
-                    st.success(f"Extracted {len(extracted.split())} words from **{uploaded_pdf.name}**")
-                else:
-                    st.warning("No text found in PDF — it may be image-based. Try pasting the text manually.")
-            except Exception as e:
-                st.error(f"Could not read PDF: {e}")
-
+        st.caption(f"Upload a {SUPPORTED_LABEL} resume, or paste / edit text below.")
+        _handle_upload("Upload resume", "candidate_text", "resume_upload_analyse")
         candidate_text = st.text_area(
-            "candidate", height=230,
+            "candidate", height=200,
             placeholder="e.g. 6 years of Python, built REST APIs with FastAPI, daily AWS and Docker usage…",
             label_visibility="collapsed",
             key="candidate_text",
@@ -494,9 +513,15 @@ with tab_compare:
     for i, col in enumerate(cand_cols):
         with col:
             name = st.text_input("Name", value=f"Candidate {i + 1}", key=f"cname_{i}")
+            st.caption(f"Upload {SUPPORTED_LABEL} or paste text.")
+            _handle_upload(
+                f"Upload {name}'s resume",
+                f"ctext_{i}",
+                f"resume_upload_compare_{i}",
+            )
             text = st.text_area(
                 "Profile",
-                height=220,
+                height=180,
                 placeholder=f"Paste {name}'s resume or profile…",
                 key=f"ctext_{i}",
                 label_visibility="collapsed",
