@@ -1,5 +1,4 @@
 """Unit tests for extractor.py — no model downloads required."""
-import pytest
 from extractor import (
     extract_education,
     extract_jd,

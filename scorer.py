@@ -71,9 +71,11 @@ def compute_fit_score(
         + SCORE_WEIGHTS["skill"] * skill_rate
     )
 
+    def is_meaningful(t: str) -> bool:
+        return len(t) > 2 and not t.isdigit()
+
     jd_tokens = _tokenize(jd_text)
     candidate_tokens = _tokenize(candidate_text)
-    is_meaningful = lambda t: len(t) > 2 and not t.isdigit()
 
     return {
         "fit_score": round(composite * 100, 1),
