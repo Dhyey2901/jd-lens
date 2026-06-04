@@ -5,8 +5,10 @@ import re
 
 from config import (
     EDUCATION_SIGNALS,
+    INDUSTRY_SIGNALS,
     KNOWN_TOOLS,
     SENIORITY_SIGNALS,
+    SOFT_SKILLS,
     WORK_TYPE_SIGNALS,
 )
 
@@ -51,12 +53,32 @@ def extract_skills_and_tools(text: str) -> list[str]:
     )
 
 
+def extract_soft_skills(text: str) -> list[str]:
+    """Return soft skills and competencies mentioned in the text."""
+    lower = text.lower()
+    return sorted(
+        skill for skill in SOFT_SKILLS
+        if re.search(r"\b" + re.escape(skill) + r"\b", lower)
+    )
+
+
+def extract_industry(text: str) -> str:
+    """Infer target industry from vocabulary signals; defaults to 'general tech'."""
+    lower = text.lower()
+    for industry, signals in INDUSTRY_SIGNALS.items():
+        if any(s in lower for s in signals):
+            return industry
+    return "general tech"
+
+
 def extract_jd(jd_text: str) -> dict[str, object]:
     """Return all structured signals parsed from a raw job description."""
     return {
         "skills_and_tools": extract_skills_and_tools(jd_text),
+        "soft_skills": extract_soft_skills(jd_text),
         "years_of_experience": extract_years_of_experience(jd_text),
         "seniority": extract_seniority(jd_text),
         "education": extract_education(jd_text),
         "work_type": extract_work_type(jd_text),
+        "industry": extract_industry(jd_text),
     }
