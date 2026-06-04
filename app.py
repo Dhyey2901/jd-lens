@@ -11,6 +11,7 @@ from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
 from extractor import extract_jd
 from scorer import compute_fit_score, get_embedding_model
+from utils import extract_text_from_pdf
 
 # ── Sample data ────────────────────────────────────────────────────────────────
 
@@ -258,9 +259,27 @@ with tab_analyse:
 
     with col_cand:
         st.subheader("Candidate Profile")
-        st.caption("Paste a resume, LinkedIn summary, or a short skills bio.")
+        st.caption("Paste a resume or LinkedIn summary — or upload a PDF to extract it automatically.")
+
+        uploaded_pdf = st.file_uploader(
+            "Upload resume PDF",
+            type=["pdf"],
+            label_visibility="collapsed",
+            key="resume_upload",
+        )
+        if uploaded_pdf is not None:
+            try:
+                extracted = extract_text_from_pdf(uploaded_pdf.read())
+                if extracted:
+                    st.session_state["candidate_text"] = extracted
+                    st.success(f"Extracted {len(extracted.split())} words from **{uploaded_pdf.name}**")
+                else:
+                    st.warning("No text found in PDF — it may be image-based. Try pasting the text manually.")
+            except Exception as e:
+                st.error(f"Could not read PDF: {e}")
+
         candidate_text = st.text_area(
-            "candidate", height=280,
+            "candidate", height=230,
             placeholder="e.g. 6 years of Python, built REST APIs with FastAPI, daily AWS and Docker usage…",
             label_visibility="collapsed",
             key="candidate_text",
