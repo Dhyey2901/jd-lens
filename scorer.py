@@ -153,7 +153,25 @@ def _classify_skills(
     candidate_lower = candidate_text.lower()
     exact, semantic, missing = [], [], []
 
+    # Primary split: punctuation / newlines
     chunks = [s.strip() for s in re.split(r"[.\n,;]", candidate_text) if len(s.strip()) > 8]
+
+    # Fallback for PDF blobs — text with stripped punctuation gives ≤ 2 chunks,
+    # making skill-level semantic matching unreliable. Use a sliding word window
+    # instead so every ~40-word region gets its own embedding.
+    if len(chunks) < 3:
+        words = candidate_text.split()
+        chunk_size, step = 40, 25
+        chunks = [
+            " ".join(words[i: i + chunk_size])
+            for i in range(0, len(words), step)
+            if " ".join(words[i: i + chunk_size]).strip()
+        ]
+        logger.debug(
+            "Blob fallback: produced %d word-window chunks from %d words",
+            len(chunks), len(words),
+        )
+
     if not chunks:
         chunks = [candidate_text]
 
@@ -197,6 +215,18 @@ def compute_fit_score(
     """
     model = embedding_model or _model()
 
+    # Diagnose early: empty jd_skills means the 40% skill weight contributes 0
+    # and the total score is capped at ~60% even for a perfect candidate.
+    logger.info(
+        "JD skills extracted: %d — %s",
+        len(jd_skills), jd_skills[:10] if jd_skills else "EMPTY — check JD formatting",
+    )
+    if not jd_skills:
+        logger.warning(
+            "No skills detected in JD. Skill dimension will be skipped and weights "
+            "redistributed to semantic + keyword. Ensure the JD lists tools/technologies."
+        )
+
     # Step 1 — clean resume noise from candidate text
     candidate_clean = _clean_resume(candidate_text)
     if not candidate_clean:
@@ -219,11 +249,18 @@ def compute_fit_score(
     skill_rate = (len(exact) + 0.5 * len(semantic_match)) / max(len(jd_skills), 1)
 
     # Step 6 — composite
-    composite = (
-        SCORE_WEIGHTS["semantic"] * sem_score
-        + SCORE_WEIGHTS["tfidf"] * combined_kw
-        + SCORE_WEIGHTS["skill"] * skill_rate
-    )
+    # If no JD skills were detected, redistribute the 40% skill weight to
+    # semantic + keyword so the score isn't artificially floored at ~60%.
+    if not jd_skills:
+        sem_w = SCORE_WEIGHTS["semantic"] / (SCORE_WEIGHTS["semantic"] + SCORE_WEIGHTS["tfidf"])
+        kw_w  = SCORE_WEIGHTS["tfidf"]    / (SCORE_WEIGHTS["semantic"] + SCORE_WEIGHTS["tfidf"])
+        composite = sem_w * sem_score + kw_w * combined_kw
+    else:
+        composite = (
+            SCORE_WEIGHTS["semantic"] * sem_score
+            + SCORE_WEIGHTS["tfidf"] * combined_kw
+            + SCORE_WEIGHTS["skill"] * skill_rate
+        )
 
     jd_tokens = _tokenize(jd_text)
     candidate_tokens = _tokenize(candidate_clean)
