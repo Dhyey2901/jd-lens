@@ -12,6 +12,43 @@ from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
 from extractor import extract_jd
 from scorer import compute_fit_score, get_embedding_model
 
+# ── Sample data ────────────────────────────────────────────────────────────────
+
+SAMPLE_JD = """Senior Data Scientist — AI/ML Platform (Remote)
+
+We are building the next generation of AI-powered analytics for enterprise clients
+and are looking for a Senior Data Scientist with 5+ years of experience.
+
+Required skills: Python, SQL, PyTorch, scikit-learn, AWS, Docker, Airflow, Kafka.
+Nice to have: Databricks, Snowflake, dbt, MLflow, LangChain.
+
+Responsibilities:
+- Design and deploy production ML models for predictive analytics and NLP tasks.
+- Collaborate cross-functionally with engineering, product, and stakeholder teams.
+- Lead data-driven decision making and communicate insights to non-technical audiences.
+- Mentor junior data scientists and contribute to ML platform architecture.
+
+Requirements:
+- Bachelor's degree in Computer Science, Statistics, or a related field.
+- Strong problem solving and analytical thinking skills.
+- Experience with stakeholder management and presentation skills.
+
+This is a fully remote position. We are a fast-paced SaaS startup."""
+
+SAMPLE_CANDIDATE = """Senior Data Scientist with 6 years of experience in AI/ML.
+
+Technical skills: Python (expert), SQL, PyTorch, scikit-learn, TensorFlow, AWS (EC2, S3, SageMaker),
+Docker, Airflow, Kafka, MLflow, Pandas, NumPy, FastAPI.
+
+Experience:
+- Built and deployed NLP models for document classification at scale (100M+ docs/day).
+- Designed end-to-end ML pipelines using Airflow and Docker on AWS.
+- Led stakeholder presentations and translated business requirements into ML solutions.
+- Mentored a team of 3 junior data scientists.
+
+Education: Bachelor of Science in Computer Science.
+Open to fully remote roles. Strong communication and problem solving background."""
+
 st.set_page_config(
     page_title="JD Lens",
     page_icon="🔍",
@@ -200,22 +237,33 @@ tab_analyse, tab_compare = st.tabs(["🔍 Analyse", "👥 Compare Candidates"])
 # ════════════════════════════════════════════════════════════════════════════════
 
 with tab_analyse:
+    # Sample button
+    _, btn_col, _ = st.columns([3, 2, 3])
+    with btn_col:
+        if st.button("Try a sample ✨", use_container_width=True):
+            st.session_state["jd_text"] = SAMPLE_JD
+            st.session_state["candidate_text"] = SAMPLE_CANDIDATE
+
     col_jd, col_cand = st.columns(2)
 
     with col_jd:
         st.subheader("Job Description")
+        st.caption("Paste the full JD — requirements, responsibilities, and qualifications.")
         jd_text = st.text_area(
-            "jd", height=300,
-            placeholder="Paste the full job description here…",
+            "jd", height=280,
+            placeholder="e.g. Senior Python Engineer with 5+ years of AWS and Docker experience…",
             label_visibility="collapsed",
+            key="jd_text",
         )
 
     with col_cand:
         st.subheader("Candidate Profile")
+        st.caption("Paste a resume, LinkedIn summary, or a short skills bio.")
         candidate_text = st.text_area(
-            "candidate", height=300,
-            placeholder="Paste your resume / profile summary here…",
+            "candidate", height=280,
+            placeholder="e.g. 6 years of Python, built REST APIs with FastAPI, daily AWS and Docker usage…",
             label_visibility="collapsed",
+            key="candidate_text",
         )
 
     analyse = st.button("Analyse ✨", type="primary", use_container_width=True)
@@ -479,3 +527,15 @@ with tab_compare:
             plot_bgcolor="rgba(0,0,0,0)",
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+# ── Footer ─────────────────────────────────────────────────────────────────────
+
+st.divider()
+st.markdown(
+    "<div style='text-align:center;color:#888;font-size:0.85rem;'>"
+    "Built by <a href='https://github.com/Dhyey2901' target='_blank' style='color:#2563EB;'>Dhyey Vyas</a> &nbsp;·&nbsp; "
+    "<a href='https://github.com/Dhyey2901/jd-lens' target='_blank' style='color:#2563EB;'>Source Code</a> &nbsp;·&nbsp; "
+    "Powered by HuggingFace Transformers &amp; Sentence Transformers"
+    "</div>",
+    unsafe_allow_html=True,
+)
