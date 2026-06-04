@@ -21,10 +21,57 @@ LABEL_DISPLAY: dict[str, str] = {
 }
 
 # ── Fit score weights (must sum to 1.0) ───────────────────────────────────────
+# Skill match gets highest weight — explicit tool/keyword coverage is the most
+# reliable signal and is least affected by resume vs JD format/tense differences.
 SCORE_WEIGHTS: dict[str, float] = {
-    "semantic": 0.50,   # sentence-transformer cosine similarity
-    "tfidf": 0.30,      # TF-IDF bigram overlap
-    "skill": 0.20,      # explicit tool/skill hit-rate
+    "semantic": 0.30,   # sentence-transformer cosine similarity
+    "tfidf": 0.30,      # TF-IDF bigram + CountVectorizer keyword overlap
+    "skill": 0.40,      # explicit tool/skill hit-rate (exact + semantic)
+}
+
+# ── Skill alias normalisation ──────────────────────────────────────────────────
+# Maps common abbreviations / alternate spellings → canonical KNOWN_TOOLS name.
+# Applied to candidate text before skill matching so "sklearn" hits "scikit-learn".
+SKILL_ALIASES: dict[str, str] = {
+    # ML / Data Science
+    "sklearn": "scikit-learn",
+    "sk-learn": "scikit-learn",
+    "scikit learn": "scikit-learn",
+    "xgb": "xgboost",
+    "lgbm": "lightgbm",
+    # Databases
+    "postgres": "postgresql",
+    "psql": "postgresql",
+    "mongo": "mongodb",
+    "dynamo": "dynamodb",
+    "dynamo db": "dynamodb",
+    "big query": "bigquery",
+    # Cloud
+    "google cloud": "gcp",
+    "google cloud platform": "gcp",
+    "amazon web services": "aws",
+    "microsoft azure": "azure",
+    "azure cloud": "azure",
+    # Languages / runtimes
+    "js": "javascript",
+    "ts": "typescript",
+    "nodejs": "node.js",
+    "node js": "node.js",
+    # Frontend frameworks
+    "reactjs": "react",
+    "react.js": "react",
+    "vuejs": "vue",
+    "vue.js": "vue",
+    "nextjs": "next.js",
+    "next js": "next.js",
+    # DevOps / CI
+    "gh actions": "github actions",
+    "cicd": "ci/cd",
+    "ci cd": "ci/cd",
+    # AI / LLM tooling
+    "hugging face": "huggingface",
+    "open ai": "openai",
+    "lang chain": "langchain",
 }
 
 # ── Extraction vocabulary ──────────────────────────────────────────────────────
