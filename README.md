@@ -1,33 +1,60 @@
 # JD Lens 🔍
 
-**NLP-powered Job Description Analyser & Role-Fit Scorer**
+## NLP-powered Job Description Analyser & Role-Fit Scorer
 
-Paste any job description and a candidate profile — JD Lens extracts key signals, classifies every sentence by intent, and scores how well the candidate fits the role.
+[![CI](https://github.com/Dhyey2901/jd-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/Dhyey2901/jd-lens/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B)](https://streamlit.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Paste any job description and a candidate profile — JD Lens extracts key signals, classifies every sentence by intent, and scores candidate fit using a hybrid of **semantic embeddings**, **TF-IDF**, and **explicit skill matching**.
+
+---
+
+## Demo
+
+> _Add a screenshot or screen recording here after first deploy._
 
 ---
 
 ## Features
 
-| Feature | How it works |
-|---|---|
-| **Skill & Tool Extraction** | spaCy phrase matching + regex against a curated tool list |
-| **Seniority Detection** | Keyword signals (junior / mid / senior / manager) |
-| **Sentence Classification** | HuggingFace `facebook/bart-large-mnli` zero-shot classification → Required / Nice-to-Have / Responsibility / Company Info |
-| **Fit Score** | TF-IDF bigram cosine similarity (0–100%) |
-| **Gap Analysis** | Keyword diff between JD and candidate profile |
+| Feature | Technique | Detail |
+| --- | --- | --- |
+| **Skill & Tool Extraction** | Regex phrase matching | 80+ tools across languages, cloud, ML, DevOps |
+| **Seniority / Education / Work Type** | Keyword signals | Parsed directly from JD text |
+| **Sentence Classification** | Zero-shot NLI | `facebook/bart-large-mnli` → Required / Nice-to-Have / Responsibility / Company Info |
+| **Semantic Fit Score** | Sentence Transformers | `all-MiniLM-L6-v2` cosine similarity (50% weight) |
+| **Keyword Overlap Score** | TF-IDF bigram | scikit-learn (30% weight) |
+| **Skill Match Rate** | Regex hit-rate | Explicit tool coverage (20% weight) |
+| **Gap Analysis** | Set difference | Keyword and skill gaps surfaced clearly |
+| **Downloadable Report** | JSON export | Full structured analysis per run |
 
 ---
 
-## Project Structure
+## Architecture
 
-```
+```text
 jd-lens/
-├── app.py          # Streamlit UI
-├── extractor.py    # spaCy extraction logic
-├── classifier.py   # HuggingFace zero-shot classification
-├── scorer.py       # TF-IDF fit scoring
-├── requirements.txt
-└── README.md
+├── app.py              # Streamlit UI — model caching, charts, layout
+├── config.py           # Central config — models, weights, vocabulary
+├── extractor.py        # Pure-regex JD signal extraction
+├── classifier.py       # HuggingFace zero-shot sentence classification
+├── scorer.py           # Hybrid semantic + TF-IDF + skill fit scorer
+├── tests/
+│   ├── test_extractor.py
+│   └── test_scorer.py
+├── .github/workflows/
+│   └── ci.yml          # GitHub Actions — pytest + ruff on Python 3.11/3.12
+└── requirements.txt
+```
+
+### Scoring formula
+
+```text
+fit_score = 0.50 × semantic_similarity   (sentence-transformers)
+          + 0.30 × tfidf_similarity       (bigram TF-IDF cosine)
+          + 0.20 × skill_match_rate       (regex hit-rate over JD tools)
 ```
 
 ---
@@ -35,47 +62,46 @@ jd-lens/
 ## Quickstart
 
 ```bash
-# 1. Clone and install dependencies
-git clone https://github.com/<your-username>/jd-lens.git
+git clone https://github.com/Dhyey2901/jd-lens.git
 cd jd-lens
+
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# 2. Download the spaCy English model
-python -m spacy download en_core_web_sm
-
-# 3. Run the app
 streamlit run app.py
 ```
 
-The first run downloads `facebook/bart-large-mnli` (~1.6 GB) and caches it locally. Subsequent runs are fast.
+> **First run:** `facebook/bart-large-mnli` (~1.6 GB) and `all-MiniLM-L6-v2` (~80 MB) are downloaded automatically by HuggingFace and cached in `~/.cache/huggingface/`. Subsequent runs load from cache and start in seconds.
 
 ---
 
-## Tech Stack
+## Running Tests
 
-- **Python 3.11+**
-- [spaCy](https://spacy.io/) — NLP extraction
-- [HuggingFace Transformers](https://huggingface.co/facebook/bart-large-mnli) — zero-shot classification
-- [scikit-learn](https://scikit-learn.org/) — TF-IDF + cosine similarity
-- [Streamlit](https://streamlit.io/) — UI + deployment
+```bash
+pip install pytest
+pytest tests/ -v
+```
 
 ---
 
 ## Deploying to Streamlit Cloud
 
 1. Push this repo to GitHub.
-2. Go to [share.streamlit.io](https://share.streamlit.io) and connect your repo.
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app** → connect repo.
 3. Set **Main file path** to `app.py`.
-4. Add a `packages.txt` file if you need system deps (not required here).
-5. Click **Deploy** — Streamlit Cloud installs `requirements.txt` automatically.
+4. Click **Deploy**.
 
-> **Note:** The HuggingFace model is downloaded at startup on Streamlit Cloud. Expect a cold-start time of ~2–3 minutes on first deploy.
+Streamlit Cloud installs `requirements.txt` automatically. Allow ~3 minutes for cold start while models download.
 
 ---
 
-## Screenshot
+## Tech Stack
 
-> _Add a screenshot of the running app here._
+- [Streamlit](https://streamlit.io) — UI & deployment
+- [sentence-transformers](https://www.sbert.net/) — semantic similarity
+- [HuggingFace Transformers](https://huggingface.co/facebook/bart-large-mnli) — zero-shot classification
+- [scikit-learn](https://scikit-learn.org/) — TF-IDF vectorisation
+- [Plotly](https://plotly.com/python/) — interactive charts
 
 ---
 
