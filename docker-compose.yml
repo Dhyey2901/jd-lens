@@ -1,0 +1,24 @@
+services:
+  ui:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - hf_cache:/app/.cache/huggingface
+    environment:
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - HF_HOME=/app/.cache/huggingface
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf_cache:/app/.cache/huggingface
+    environment:
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - HF_HOME=/app/.cache/huggingface
+    command: uvicorn api:app --host 0.0.0.0 --port 8000 --workers 2
+
+volumes:
+  hf_cache:
