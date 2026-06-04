@@ -1,26 +1,21 @@
+"""Zero-shot JD sentence classification using facebook/bart-large-mnli."""
+from __future__ import annotations
+
 import re
-from transformers import pipeline
+from typing import Any
 
-_classifier = None
+from config import CANDIDATE_LABELS, LABEL_DISPLAY, ZERO_SHOT_MODEL
 
-CANDIDATE_LABELS = ["required skill", "nice to have", "responsibility", "company info"]
-
-LABEL_MAP = {
-    "required skill": "Required",
-    "nice to have": "Nice-to-Have",
-    "responsibility": "Responsibility",
-    "company info": "Company Info",
-}
+_pipeline: Any = None
 
 
-def _get_classifier():
-    global _classifier
-    if _classifier is None:
-        _classifier = pipeline(
-            "zero-shot-classification",
-            model="facebook/bart-large-mnli",
-        )
-    return _classifier
+def get_pipeline() -> Any:
+    """Lazy-load and cache the zero-shot classification pipeline."""
+    global _pipeline
+    if _pipeline is None:
+        from transformers import pipeline
+        _pipeline = pipeline("zero-shot-classification", model=ZERO_SHOT_MODEL)
+    return _pipeline
 
 
 def split_sentences(text: str) -> list[str]:
@@ -28,18 +23,26 @@ def split_sentences(text: str) -> list[str]:
     return [s.strip() for s in sentences if len(s.strip()) > 15]
 
 
-def classify_jd(jd_text: str, batch_size: int = 8) -> dict[str, list[str]]:
+def classify_jd(
+    jd_text: str,
+    pipeline: Any = None,
+    batch_size: int = 8,
+) -> dict[str, list[dict[str, Any]]]:
+    """Classify each JD sentence into a bucket, returning text + confidence."""
+    clf = pipeline or get_pipeline()
     sentences = split_sentences(jd_text)
     if not sentences:
-        return {label: [] for label in LABEL_MAP.values()}
+        return {label: [] for label in LABEL_DISPLAY.values()}
 
-    clf = _get_classifier()
     results = clf(sentences, CANDIDATE_LABELS, batch_size=batch_size)
 
-    buckets: dict[str, list[str]] = {label: [] for label in LABEL_MAP.values()}
+    buckets: dict[str, list[dict[str, Any]]] = {
+        label: [] for label in LABEL_DISPLAY.values()
+    }
     for sentence, result in zip(sentences, results):
         top_label = result["labels"][0]
-        bucket = LABEL_MAP.get(top_label, "Company Info")
-        buckets[bucket].append(sentence)
+        confidence = round(result["scores"][0] * 100, 1)
+        bucket = LABEL_DISPLAY.get(top_label, "Company Info")
+        buckets[bucket].append({"text": sentence, "confidence": confidence})
 
     return buckets
