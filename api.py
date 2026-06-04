@@ -52,8 +52,10 @@ class JdSignals(BaseModel):
     seniority: str
     education: str
     work_type: str
+    industry: str
     years_of_experience: list[str]
     skills_detected: list[str]
+    soft_skills: list[str]
 
 
 class SkillAnalysis(BaseModel):
@@ -118,8 +120,10 @@ def analyse(req: AnalyseRequest) -> Any:
             seniority=jd_info["seniority"],
             education=jd_info["education"],
             work_type=jd_info["work_type"],
+            industry=jd_info["industry"],
             years_of_experience=jd_info["years_of_experience"],
             skills_detected=jd_info["skills_and_tools"],
+            soft_skills=jd_info.get("soft_skills", []),
         ),
         skill_analysis=SkillAnalysis(
             matched=matched,

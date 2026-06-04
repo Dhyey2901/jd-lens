@@ -1,9 +1,11 @@
 """Unit tests for extractor.py — no model downloads required."""
 from extractor import (
     extract_education,
+    extract_industry,
     extract_jd,
     extract_seniority,
     extract_skills_and_tools,
+    extract_soft_skills,
     extract_work_type,
     extract_years_of_experience,
 )
@@ -95,12 +97,44 @@ class TestSkillsAndTools:
         assert "r" not in result or "docker" in result
 
 
+class TestSoftSkills:
+    def test_detects_communication(self):
+        assert "communication" in extract_soft_skills("Excellent communication skills required")
+
+    def test_detects_leadership(self):
+        assert "leadership" in extract_soft_skills("Strong leadership and mentoring ability")
+
+    def test_detects_problem_solving(self):
+        assert "problem solving" in extract_soft_skills("Strong problem solving skills")
+
+    def test_returns_sorted(self):
+        result = extract_soft_skills("leadership communication teamwork")
+        assert result == sorted(result)
+
+    def test_no_false_positives(self):
+        assert extract_soft_skills("Python AWS Docker PostgreSQL") == []
+
+
+class TestIndustry:
+    def test_fintech(self):
+        assert extract_industry("We are a leading fintech payments company") == "fintech / finance"
+
+    def test_healthcare(self):
+        assert extract_industry("Join our healthcare data platform team") == "healthcare"
+
+    def test_ecommerce(self):
+        assert extract_industry("Build features for our ecommerce marketplace") == "e-commerce / retail"
+
+    def test_general_tech_fallback(self):
+        assert extract_industry("Looking for a Python developer") == "general tech"
+
+
 class TestExtractJd:
     def test_full_output_keys(self):
         result = extract_jd(JD_SAMPLE)
         assert set(result.keys()) == {
-            "skills_and_tools", "years_of_experience",
-            "seniority", "education", "work_type",
+            "skills_and_tools", "soft_skills", "years_of_experience",
+            "seniority", "education", "work_type", "industry",
         }
 
     def test_integration_senior(self):
