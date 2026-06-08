@@ -9,7 +9,7 @@ import streamlit as st
 
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
-from extractor import extract_jd
+from extractor import extract_jd, extract_required_sentences
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
 
@@ -336,19 +336,14 @@ with tab_analyse:
             st.stop()
 
         with st.spinner("Loading models…"):
-            clf_pipeline = load_classifier()
             embedder = load_embedder()
 
         with st.spinner("Extracting JD signals…"):
             jd_info = extract_jd(jd_text)
 
-        with st.spinner("Classifying JD sentences (first run downloads ~1.6 GB model)…"):
-            buckets = classify_jd(jd_text, pipeline=clf_pipeline)
-
-        # Build a focused "required-only" JD text for more accurate semantic scoring.
-        # Passed to bi-encoder so scoring ignores filler / company-info sentences.
-        required_sents = [item["text"] for item in buckets.get("Required", [])]
-        required_jd_text = " ".join(required_sents) if required_sents else None
+        # Build required_jd_text via fast regex heuristic — no model needed.
+        # The zero-shot classifier runs later (below the fold) for the pie chart.
+        required_jd_text = extract_required_sentences(jd_text) or None
 
         with st.spinner("Scoring candidate fit…"):
             score_info = compute_fit_score(
@@ -356,8 +351,6 @@ with tab_analyse:
                 jd_skills=jd_info["skills_and_tools"],
                 embedding_model=embedder,
                 required_jd_text=required_jd_text,
-                # cross_encoder intentionally omitted: ms-marco is a search-relevance
-                # model, not a semantic similarity model — it underscores resumes vs JDs.
             )
 
         st.divider()
@@ -431,17 +424,25 @@ with tab_analyse:
             st.markdown("**Soft skills in JD:**")
             st.markdown(_soft_tags_html(jd_info["soft_skills"]), unsafe_allow_html=True)
 
-        # ── Score breakdown + classification pie ───────────────────────────────
+        # ── Score breakdown ────────────────────────────────────────────────────
         st.divider()
-        col_breakdown, col_pie = st.columns(2)
+        st.subheader("Score Breakdown")
+        st.plotly_chart(
+            _breakdown_chart(score_info["score_breakdown"]),
+            use_container_width=True, config={"displayModeBar": False},
+        )
 
-        with col_breakdown:
-            st.subheader("Score Breakdown")
-            st.plotly_chart(
-                _breakdown_chart(score_info["score_breakdown"]),
-                use_container_width=True, config={"displayModeBar": False},
-            )
+        # ── Recommendation ─────────────────────────────────────────────────────
+        st.divider()
+        st.info(f"💡 {_generate_recommendation(score_info, jd_info)}")
 
+        # ── Sentence classification — runs after score is visible ──────────────
+        st.divider()
+        with st.spinner("Classifying JD sentences (first run downloads ~1.6 GB model)…"):
+            clf_pipeline = load_classifier()
+            buckets = classify_jd(jd_text, pipeline=clf_pipeline)
+
+        col_pie, col_blank = st.columns([2, 3])
         with col_pie:
             st.subheader("JD Sentence Mix")
             st.plotly_chart(
@@ -449,11 +450,6 @@ with tab_analyse:
                 use_container_width=True, config={"displayModeBar": False},
             )
 
-        # ── Recommendation ─────────────────────────────────────────────────────
-        st.divider()
-        st.info(f"💡 {_generate_recommendation(score_info, jd_info)}")
-
-        # ── Sentence classification (tabbed) ───────────────────────────────────
         st.subheader("JD Sentence Classification")
         tab_req, tab_nice, tab_resp, tab_co = st.tabs(
             ["Required 🔴", "Nice-to-Have 🟡", "Responsibilities 🔵", "Company Info ⚪"]

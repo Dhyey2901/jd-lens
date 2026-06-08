@@ -137,6 +137,32 @@ def extract_unknown_tools(text: str) -> list[str]:
     return result
 
 
+# Sentence-level signals that strongly indicate a "Required" sentence.
+_REQUIRED_SIGNALS: list[str] = [
+    "required", "must have", "you must", "we require", "essential",
+    "mandatory", "need to have", "you need", "you will need",
+    "bachelor", "master", "degree in", "years of experience",
+    "proficiency in", "experience with", "knowledge of", "familiarity with",
+    "expertise in", "background in", "skilled in",
+    "citizen", "permanent resident", "eligible to work",
+]
+
+
+def extract_required_sentences(text: str) -> str:
+    """Return sentences that look like hard requirements — no model needed.
+
+    Used to build required_jd_text for focused semantic scoring without
+    waiting for the zero-shot classifier (~1.6 GB bart-large-mnli).
+    """
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+    matched = [
+        s.strip() for s in sentences
+        if len(s.strip()) > 15
+        and any(sig in s.lower() for sig in _REQUIRED_SIGNALS)
+    ]
+    return " ".join(matched)
+
+
 def extract_jd(jd_text: str) -> dict[str, object]:
     """Return all structured signals parsed from a raw job description."""
     skills_and_tools = extract_skills_and_tools(jd_text)
