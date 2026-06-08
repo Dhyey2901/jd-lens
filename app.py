@@ -9,7 +9,7 @@ import streamlit as st
 
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
-from extractor import extract_jd, extract_required_sentences
+from extractor import extract_jd
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
 
@@ -341,16 +341,11 @@ with tab_analyse:
         with st.spinner("Extracting JD signals…"):
             jd_info = extract_jd(jd_text)
 
-        # Build required_jd_text via fast regex heuristic — no model needed.
-        # The zero-shot classifier runs later (below the fold) for the pie chart.
-        required_jd_text = extract_required_sentences(jd_text) or None
-
         with st.spinner("Scoring candidate fit…"):
             score_info = compute_fit_score(
                 jd_text, candidate_text,
                 jd_skills=jd_info["skills_and_tools"],
                 embedding_model=embedder,
-                required_jd_text=required_jd_text,
             )
 
         st.divider()
