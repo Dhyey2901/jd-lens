@@ -1,4 +1,4 @@
-.PHONY: install api app dev test lint
+.PHONY: install api app dev test lint eval
 
 install:
 	pip install -r requirements.txt
@@ -21,3 +21,11 @@ test:
 
 lint:
 	ruff check . --select=E,F,W --ignore=E501
+
+# Full eval against ground-truth pairs (downloads embedding model on first run)
+eval:
+	python eval/run_eval.py
+
+# Fast eval — signals only, no model download
+eval-fast:
+	python eval/run_eval.py --fast

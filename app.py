@@ -357,6 +357,7 @@ with tab_analyse:
             jd_text=jd_text,
             jd_skills=jd_info.get("skills_and_tools", []),
             missing_skills=score_info["missing_skills"],
+            skill_weights=jd_info.get("skill_weights", {}),
         )
         prediction = generate_prediction(
             jd_match=fit,
@@ -451,12 +452,22 @@ with tab_analyse:
             if top_bullets:
                 st.markdown("**Top resume lines for this JD:**")
                 for b in top_bullets:
+                    jd_req = b.get("jd_req", "")
+                    req_html = (
+                        f"<div style='font-size:.75rem;color:#888;margin-top:3px;'>"
+                        f"↔ &nbsp;<em>{jd_req}</em></div>"
+                        if jd_req else ""
+                    )
                     st.markdown(
-                        f"<div style='font-size:.84rem;padding:7px 12px;margin:4px 0;"
+                        f"<div style='font-size:.84rem;padding:8px 12px;margin:5px 0;"
                         f"border-left:3px solid #2563eb;background:#2563eb08;"
-                        f"border-radius:4px;'>{b['text']}"
-                        f"<span style='float:right;font-size:.75rem;color:#888;'>"
-                        f"{b['score']}% match</span></div>",
+                        f"border-radius:4px;'>"
+                        f"<div style='display:flex;justify-content:space-between;"
+                        f"align-items:flex-start;'>"
+                        f"<span>{b['text']}</span>"
+                        f"<span style='font-size:.75rem;color:#888;white-space:nowrap;"
+                        f"margin-left:10px;'>{b['score']}%</span></div>"
+                        f"{req_html}</div>",
                         unsafe_allow_html=True,
                     )
 

@@ -304,11 +304,11 @@ def _bullet_alignment_scores(
     model: Any,
     top_n: int = 3,
 ) -> list[dict]:
-    """Return top N resume lines ranked by semantic similarity to the JD.
+    """Return top N resume lines with their best-matching JD requirement.
 
-    Splits the candidate text on newlines and sentence boundaries, drops
-    lines shorter than 25 chars (headers, dates, single words), then ranks
-    the remainder against the full JD using cosine similarity.
+    For each top resume bullet, finds the single JD requirement sentence it
+    aligns with most closely — so HR can see "this bullet satisfies that
+    requirement" rather than just a raw similarity number.
     """
     bullets = [
         s.strip()
@@ -317,12 +317,31 @@ def _bullet_alignment_scores(
     ]
     if not bullets:
         return []
-    jd_emb = model.encode([jd_text], normalize_embeddings=True)
+
+    # JD requirements: individual sentences, filtered to a useful length range
+    jd_reqs = [
+        s.strip()
+        for s in re.split(r"\n|(?<=[.!?])\s+", jd_text)
+        if 20 < len(s.strip()) < 300
+    ] or [jd_text]
+
     bullet_embs = model.encode(bullets, normalize_embeddings=True)
-    scores = cosine_similarity(bullet_embs, jd_emb).flatten()
-    top_idx = np.argsort(scores)[::-1][:top_n]
+    req_embs   = model.encode(jd_reqs,  normalize_embeddings=True)
+
+    # Rank bullets against JD centroid for selection
+    jd_centroid = req_embs.mean(axis=0, keepdims=True)
+    jd_scores   = cosine_similarity(bullet_embs, jd_centroid).flatten()
+
+    # Per-bullet × per-requirement similarity for best-match lookup
+    req_sim = cosine_similarity(bullet_embs, req_embs)  # (n_bullets, n_reqs)
+
+    top_idx = np.argsort(jd_scores)[::-1][:top_n]
     return [
-        {"text": bullets[i], "score": round(float(scores[i]) * 100, 1)}
+        {
+            "text":    bullets[i],
+            "jd_req":  jd_reqs[int(np.argmax(req_sim[i]))],
+            "score":   round(float(req_sim[i].max()) * 100, 1),
+        }
         for i in top_idx
     ]
 

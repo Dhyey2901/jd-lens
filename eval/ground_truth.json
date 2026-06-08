@@ -1,0 +1,57 @@
+[
+  {
+    "id": "strong_candidate_ml_engineer",
+    "description": "Senior ML engineer matching all required tools with quantified impact — expect Strong Candidate",
+    "jd": "Senior ML Engineer\n\nRequired\nPython, PyTorch, AWS, Docker, Airflow. 5+ years of experience.\nDeploy production ML models. Strong background in distributed systems.\n\nResponsibilities\nBuild and deploy end-to-end ML pipelines. Lead a team of engineers.\nDesign scalable inference systems handling high request volumes.\n\nNice to have\nMLflow, Kafka, LangChain.",
+    "resume": "Senior ML Engineer — 7 years experience.\n\nTECHNICAL SKILLS\nPython, PyTorch, AWS, Docker, Airflow, MLflow, Kafka\n\nEXPERIENCE\n- Deployed NLP models processing 50M+ requests per day on AWS.\n- Built end-to-end ML pipelines using Airflow and Docker.\n- Reduced model inference latency by 60% through batch optimisation.\n- Led a team of 4 engineers across model development and deployment.\n- Designed distributed real-time scoring system with 99.9% uptime.\n\nEDUCATION\nMaster of Computer Science, University of Melbourne (2016-2018)",
+    "expected": {
+      "verdict": "Strong Candidate",
+      "jd_match_range": [55, 100],
+      "signal_range": [65, 100]
+    }
+  },
+  {
+    "id": "overlooked_gem_grad_consulting",
+    "description": "Grad applicant with strong depth signals but missing consulting keywords — real-world calibration case",
+    "jd": "Graduate Technology Analyst\n\nRequired\nProblem solving, analytical thinking, communication, teamwork.\nBachelor or Master degree in any field. Australian work rights.\n\nResponsibilities\nAnalyse client data to surface insights. Build reports and dashboards.\nCollaborate with stakeholder teams across engineering and product.\n\nNice to have\nPython, SQL, Power BI, Tableau.",
+    "resume": "Master of Data Science, RMIT University (2024-Present)\nBachelor of Information Technology, DDU (2020-2024)\n\nEXPERIENCE\n- Built NLP pipeline classifying 100K+ documents with 91% accuracy.\n- Deployed web application serving 500+ daily users on AWS.\n- Reduced data processing time by 40% through pipeline optimisation.\n- Led team of 3 for capstone project, presented findings to academic panel.\n- Developed end-to-end retrieval system using hybrid semantic search.\n\nTECHNICAL SKILLS\nPython, SQL, scikit-learn, PyTorch, AWS, Docker\n\nStrong communication and analytical problem solving background.",
+    "expected": {
+      "verdict": "Overlooked Gem",
+      "jd_match_range": [20, 65],
+      "signal_range": [60, 100]
+    }
+  },
+  {
+    "id": "keyword_match_verify_depth",
+    "description": "Data engineer who lists all required tools but shows no deployment evidence or quantified work",
+    "jd": "Data Engineer\n\nRequired\nSpark, Kafka, Airflow, dbt, Python, SQL. Experience with data pipelines.\n\nResponsibilities\nBuild and maintain ETL pipelines. Manage data warehouse on Snowflake.\nEnsure data quality and pipeline reliability at scale.\n\nNice to have\nDatabricks, AWS, Kubernetes.",
+    "resume": "Data Engineer with experience in data systems.\n\nSKILLS\nSpark, Kafka, Airflow, dbt, Python, SQL, Snowflake\n\nEXPERIENCE\n- Participated in data pipeline projects using Spark and Kafka.\n- Helped with ETL processes and assisted the team with Airflow.\n- Was involved in dbt model development and supported SQL work.\n- Contributed to data warehouse maintenance tasks.\n- Participated in team meetings and assisted with pipeline documentation.",
+    "expected": {
+      "verdict": "Keyword Match — Verify Depth",
+      "jd_match_range": [40, 100],
+      "signal_range": [0, 55]
+    }
+  },
+  {
+    "id": "significant_gaps_wrong_domain",
+    "description": "Marketing professional applying for an ML engineering role — domain mismatch with weak signals",
+    "jd": "Machine Learning Engineer\n\nRequired\nPython, TensorFlow, PyTorch, AWS, model deployment experience.\n3+ years building production ML systems.\n\nResponsibilities\nDevelop and deploy deep learning models. Build feature engineering pipelines.\nOptimise model performance and monitor production systems.",
+    "resume": "Marketing Manager — 4 years in digital marketing.\n\nEXPERIENCE\n- Helped coordinate social media campaigns across platforms.\n- Assisted with email marketing and supported the content team.\n- Participated in brand strategy meetings with senior management.\n- Was involved in campaign reporting and aided with analytics.\n\nEDUCATION\nBachelor of Business (Marketing), Monash University (2018-2021)",
+    "expected": {
+      "verdict": "Significant Gaps",
+      "jd_match_range": [0, 40],
+      "signal_range": [0, 50]
+    }
+  },
+  {
+    "id": "moderate_fit_data_analyst",
+    "description": "Analyst with some matching tools but partial coverage — expect Moderate Fit",
+    "jd": "Data Analyst\n\nRequired\nSQL, Tableau, Excel, reporting and data visualisation skills.\nStrong communication and stakeholder management.\n\nResponsibilities\nBuild dashboards and weekly reports for business stakeholders.\nAnalyse customer data to identify trends and business insights.\n\nNice to have\nPython, Power BI, A/B testing experience.",
+    "resume": "Junior Data Analyst — 2 years experience.\n\nSKILLS\nSQL, Excel, Python, basic Tableau\n\nEXPERIENCE\n- Built weekly sales reports for 3 regional managers using SQL.\n- Designed Tableau dashboard reducing manual reporting time by 2 hours/week.\n- Analysed customer churn data for retention team.\n- Presented findings to marketing stakeholders quarterly.\n\nEDUCATION\nBachelor of Commerce (Economics), University of Sydney (2019-2022)",
+    "expected": {
+      "verdict": "Moderate Fit",
+      "jd_match_range": [30, 70],
+      "signal_range": [40, 75]
+    }
+  }
+]

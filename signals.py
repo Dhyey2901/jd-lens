@@ -226,15 +226,24 @@ def detect_role_type(jd_text: str) -> str:
     return best if scores[best] >= 2 else "general"
 
 
-def _score_skill_gap(jd_skills: list[str], missing_skills: list[str] | None) -> float:
-    """Fraction of JD-required skills the candidate covers.
+def _score_skill_gap(
+    jd_skills: list[str],
+    missing_skills: list[str] | None,
+    skill_weights: dict[str, float] | None = None,
+) -> float:
+    """Weighted fraction of JD-required skills the candidate covers.
 
-    Returns 1.0 (neutral) when no JD skills are listed or when
-    missing_skills data is unavailable — avoids penalising in the
-    absence of information.  A candidate missing 4 of 8 skills → 0.5.
+    When skill_weights are provided (from parse_jd_sections), missing a
+    Required-section skill penalises more than missing a Nice-to-have.
+    Falls back to uniform weighting when weights are unavailable.
+    Returns 1.0 (neutral) when no JD skills or missing_skills data.
     """
     if not jd_skills or missing_skills is None:
         return 1.0
+    if skill_weights:
+        total_w = sum(skill_weights.get(s, 1.0) for s in jd_skills)
+        missing_w = sum(skill_weights.get(s, 1.0) for s in missing_skills)
+        return max(1.0 - missing_w / total_w, 0.0)
     present = max(len(jd_skills) - len(missing_skills), 0)
     return present / len(jd_skills)
 
@@ -320,6 +329,7 @@ def compute_hiring_signals(
     jd_text: str | None = None,
     jd_skills: list[str] | None = None,
     missing_skills: list[str] | None = None,
+    skill_weights: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Compute hiring signal scores, weighted for the detected role type.
 
@@ -343,7 +353,7 @@ def compute_hiring_signals(
     verbs = _score_verbs(candidate_text)
     trajectory = _score_trajectory(candidate_text)
     soft_cov = _score_soft_coverage(candidate_text, jd_soft_skills)
-    skill_gap = _score_skill_gap(jd_skills, missing_skills)
+    skill_gap = _score_skill_gap(jd_skills, missing_skills, skill_weights)
 
     composite = (
         weights["impact"]     * impact

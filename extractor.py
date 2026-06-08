@@ -148,6 +148,95 @@ _REQUIRED_SIGNALS: list[str] = [
 ]
 
 
+# ── Section-aware JD parsing ───────────────────────────────────────────────────
+
+_SECTION_WEIGHT_MAP: list[tuple[list[str], float]] = [
+    (["required", "must have", "essential", "mandatory", "minimum"], 2.0),
+    (["skill", "qualification", "technical requirement", "core competenc"], 1.5),
+    (["preferred", "desirable", "desired", "ideal candidate"],          1.0),
+    (["nice to have", "nice-to-have", "bonus", "advantageous", "optional"], 0.5),
+    (["responsibilit", "duties", "you will", "what you'll"],            1.0),
+]
+
+
+def _section_multiplier(header: str) -> float:
+    lower = header.lower()
+    for keywords, mult in _SECTION_WEIGHT_MAP:
+        if any(kw in lower for kw in keywords):
+            return mult
+    return 1.0
+
+
+def _is_section_header(line: str) -> bool:
+    s = line.strip().rstrip(":").strip()
+    return (
+        3 <= len(s) <= 45
+        and "," not in s
+        and "." not in s
+        and len(s.split()) <= 5
+        and bool(s) and s[0].isupper()
+    )
+
+
+def parse_jd_sections(jd_text: str) -> list[tuple[str, float]]:
+    """Split a JD into (section_text, weight_multiplier) pairs.
+
+    The first block before any detected section header is treated as the
+    title / overview and given a 3× multiplier.  Each subsequent section
+    is weighted by its header (Required → 2×, Nice-to-have → 0.5×, etc.).
+    Falls back to [(jd_text, 1.0)] when no headers are detected.
+    """
+    lines = jd_text.splitlines()
+    split_points: list[int] = []  # line indices of section headers
+    for i, line in enumerate(lines):
+        if _is_section_header(line) and line.strip():
+            split_points.append(i)
+
+    if not split_points:
+        return [(jd_text, 1.0)]
+
+    sections: list[tuple[str, float]] = []
+
+    # Title block
+    title_text = "\n".join(lines[:split_points[0]]).strip()
+    if title_text:
+        sections.append((title_text, 3.0))
+
+    for idx, start_line in enumerate(split_points):
+        header = lines[start_line].strip().rstrip(":")
+        end_line = split_points[idx + 1] if idx + 1 < len(split_points) else len(lines)
+        content = "\n".join(lines[start_line + 1:end_line]).strip()
+        if content:
+            sections.append((content, _section_multiplier(header)))
+
+    return sections or [(jd_text, 1.0)]
+
+
+def weighted_skill_frequencies(
+    jd_text: str,
+    skills: list[str],
+) -> dict[str, float]:
+    """Return a normalised importance weight [0.5, 1.0] for each skill.
+
+    Skills mentioned in Required sections score closer to 1.0; skills
+    only appearing in Nice-to-have score closer to 0.5.  Skills absent
+    from the JD get no entry — callers should use .get(skill, 1.0).
+    """
+    sections = parse_jd_sections(jd_text)
+    raw: dict[str, float] = {}
+    for skill in skills:
+        pat = re.compile(r"\b" + re.escape(skill) + r"\b", re.IGNORECASE)
+        total = sum(len(pat.findall(text)) * mult for text, mult in sections)
+        if total > 0:
+            raw[skill] = total
+
+    if not raw:
+        return {}
+
+    max_w = max(raw.values())
+    return {s: 0.5 + 0.5 * (w / max_w) for s, w in raw.items()}
+
+
 def extract_required_sentences(text: str) -> str:
     """Return sentences that look like hard requirements — no model needed.
 
@@ -167,9 +256,11 @@ def extract_jd(jd_text: str) -> dict[str, object]:
     """Return all structured signals parsed from a raw job description."""
     skills_and_tools = extract_skills_and_tools(jd_text)
     unknown_tools = extract_unknown_tools(jd_text)
+    skill_weights = weighted_skill_frequencies(jd_text, skills_and_tools)
     result = {
         "skills_and_tools": skills_and_tools,
         "unknown_tools": unknown_tools,
+        "skill_weights": skill_weights,
         "soft_skills": extract_soft_skills(jd_text),
         "years_of_experience": extract_years_of_experience(jd_text),
         "seniority": extract_seniority(jd_text),

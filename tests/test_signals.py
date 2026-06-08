@@ -263,3 +263,20 @@ class TestScoreSkillGap:
             STRONG_RESUME, jd_skills=["python", "sql", "aws", "kafka"], missing_skills=["aws", "kafka"]
         )
         assert all_present["hiring_signal_score"] >= half_missing["hiring_signal_score"]
+
+    def test_required_missing_skill_penalises_more_than_optional(self):
+        # Missing a "required" skill (weight=1.0) should penalise more
+        # than missing a "nice to have" skill (weight=0.5).
+        high_weight_missing = compute_hiring_signals(
+            STRONG_RESUME,
+            jd_skills=["python", "sql"],
+            missing_skills=["python"],
+            skill_weights={"python": 1.0, "sql": 0.5},
+        )
+        low_weight_missing = compute_hiring_signals(
+            STRONG_RESUME,
+            jd_skills=["python", "sql"],
+            missing_skills=["sql"],
+            skill_weights={"python": 1.0, "sql": 0.5},
+        )
+        assert high_weight_missing["hiring_signal_score"] < low_weight_missing["hiring_signal_score"]

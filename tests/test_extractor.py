@@ -9,6 +9,8 @@ from extractor import (
     extract_unknown_tools,
     extract_work_type,
     extract_years_of_experience,
+    parse_jd_sections,
+    weighted_skill_frequencies,
 )
 
 JD_SAMPLE = """
@@ -164,11 +166,77 @@ class TestUnknownTools:
         assert result == []
 
 
+class TestParseJdSections:
+    JD_SECTIONED = (
+        "Senior Data Scientist — AI Platform\n\n"
+        "Required\n"
+        "Python, SQL, AWS. 3+ years of experience.\n\n"
+        "Nice to have\n"
+        "Databricks, dbt, Spark.\n\n"
+        "Responsibilities\n"
+        "Build and deploy ML models at scale."
+    )
+
+    def test_returns_list_of_tuples(self):
+        result = parse_jd_sections(self.JD_SECTIONED)
+        assert isinstance(result, list)
+        assert all(isinstance(t, tuple) and len(t) == 2 for t in result)
+
+    def test_title_block_gets_highest_multiplier(self):
+        result = parse_jd_sections(self.JD_SECTIONED)
+        title_mult = result[0][1]
+        assert title_mult == 3.0
+
+    def test_required_section_gets_two_times(self):
+        result = parse_jd_sections(self.JD_SECTIONED)
+        req = next((r for r in result if "python" in r[0].lower()), None)
+        assert req is not None
+        assert req[1] == 2.0
+
+    def test_nice_to_have_gets_half_multiplier(self):
+        result = parse_jd_sections(self.JD_SECTIONED)
+        nth = next((r for r in result if "databricks" in r[0].lower()), None)
+        assert nth is not None
+        assert nth[1] == 0.5
+
+    def test_fallback_for_unsectioned_jd(self):
+        result = parse_jd_sections("We are looking for a Python developer.")
+        assert len(result) == 1
+        assert result[0][1] == 1.0
+
+
+class TestWeightedSkillFrequencies:
+    def test_required_skill_outweights_optional(self):
+        jd = "Required\nPython, AWS required.\n\nNice to have\nDatabricks optional."
+        weights = weighted_skill_frequencies(jd, ["python", "databricks"])
+        assert weights.get("python", 0) > weights.get("databricks", 0)
+
+    def test_absent_skill_has_no_entry(self):
+        jd = "We need Python developers."
+        weights = weighted_skill_frequencies(jd, ["python", "kubernetes"])
+        assert "kubernetes" not in weights
+
+    def test_scores_normalised_to_half_one_range(self):
+        jd = "Required\nPython, SQL.\n\nNice to have\nTableau."
+        weights = weighted_skill_frequencies(jd, ["python", "sql", "tableau"])
+        for v in weights.values():
+            assert 0.5 <= v <= 1.0
+
+    def test_empty_skills_returns_empty_dict(self):
+        assert weighted_skill_frequencies("Some JD text.", []) == {}
+
+    def test_skill_weights_included_in_extract_jd(self):
+        jd = "Required\nPython, SQL.\n\nNice to have\nTableau."
+        result = extract_jd(jd)
+        assert "skill_weights" in result
+        assert isinstance(result["skill_weights"], dict)
+
+
 class TestExtractJd:
     def test_full_output_keys(self):
         result = extract_jd(JD_SAMPLE)
         assert set(result.keys()) == {
-            "skills_and_tools", "unknown_tools", "soft_skills",
+            "skills_and_tools", "unknown_tools", "skill_weights", "soft_skills",
             "years_of_experience", "seniority", "education", "work_type", "industry",
         }
 
