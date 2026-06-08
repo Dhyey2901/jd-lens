@@ -1,6 +1,7 @@
 """Hybrid fit scorer: semantic embeddings (30%) + keyword overlap (30%) + skill match (40%)."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from typing import Any
@@ -297,6 +298,20 @@ def _tokenize_meaningful(tokens: set[str]) -> list[str]:
     return sorted(t for t in tokens if len(t) > 2 and not t.isdigit())
 
 
+# ── Result cache ──────────────────────────────────────────────────────────────
+# Keyed by SHA-256 of (jd_text, candidate_text, sorted jd_skills).
+# Model instances and required_jd_text are NOT part of the key — same inputs
+# always produce the same score regardless of which model object is passed.
+
+_score_cache: dict[str, dict[str, Any]] = {}
+_SCORE_CACHE_MAX = 128
+
+
+def _cache_key(jd_text: str, candidate_text: str, jd_skills: list[str]) -> str:
+    raw = f"{jd_text}\x00{candidate_text}\x00{'|'.join(sorted(jd_skills))}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 # ── Main scoring function ──────────────────────────────────────────────────────
 
 def compute_fit_score(
@@ -319,6 +334,12 @@ def compute_fit_score(
       6. Composite = 0.30 sem + 0.30 keyword + 0.40 skill.
     """
     model = embedding_model or _model()
+
+    # Cache check — skip recomputation for repeated (jd, candidate, skills) triples.
+    _key = _cache_key(jd_text, candidate_text, jd_skills)
+    if _key in _score_cache:
+        logger.debug("Score cache hit — returning cached result")
+        return _score_cache[_key]
 
     # Diagnose early: empty jd_skills means the 40% skill weight contributes 0
     # and the total score is capped at ~60% even for a perfect candidate.
@@ -394,7 +415,7 @@ def compute_fit_score(
         len(exact), len(semantic_match), len(missing),
     )
 
-    return {
+    result = {
         "fit_score": round(composite * 100, 1),
         "score_breakdown": {
             "Semantic Similarity": round(sem_score * 100, 1),
@@ -407,3 +428,9 @@ def compute_fit_score(
         "matched_keywords": _tokenize_meaningful(jd_tokens & candidate_tokens)[:60],
         "gap_keywords": _tokenize_meaningful(jd_tokens - candidate_tokens)[:60],
     }
+
+    # Evict oldest entry when the cache is full (dict insertion order = LRU).
+    if len(_score_cache) >= _SCORE_CACHE_MAX:
+        _score_cache.pop(next(iter(_score_cache)))
+    _score_cache[_key] = result
+    return result

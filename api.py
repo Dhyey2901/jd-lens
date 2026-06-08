@@ -51,6 +51,16 @@ class AnalyseRequest(BaseModel):
         description="Candidate resume or profile summary.",
         examples=["6 years of Python, deployed microservices on AWS ECS, daily Docker and Kubernetes usage."],
     )
+    required_jd_text: str | None = Field(
+        None,
+        max_length=6_000,
+        description=(
+            "Optional: JD sentences pre-classified as 'Required'. "
+            "When provided the scorer focuses semantic similarity on these sentences "
+            "rather than the full JD, improving accuracy. "
+            "Obtain by running the /analyse flow and passing back the Required bucket text."
+        ),
+    )
 
 
 class JdSignals(BaseModel):
@@ -108,6 +118,7 @@ def analyse(req: AnalyseRequest) -> Any:
             req.jd_text,
             req.candidate_text,
             jd_skills=jd_info["skills_and_tools"],
+            required_jd_text=req.required_jd_text,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
