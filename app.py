@@ -10,7 +10,7 @@ import streamlit as st
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
 from extractor import extract_jd
-from scorer import compute_fit_score, get_embedding_model
+from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
 
 # ── Sample data ────────────────────────────────────────────────────────────────
@@ -67,6 +67,11 @@ def load_classifier():
 @st.cache_resource(show_spinner=False)
 def load_embedder():
     return get_embedding_model()
+
+
+@st.cache_resource(show_spinner=False)
+def load_cross_encoder():
+    return get_cross_encoder()
 
 
 # ── Visual helpers ─────────────────────────────────────────────────────────────
@@ -333,19 +338,26 @@ with tab_analyse:
         with st.spinner("Loading models…"):
             clf_pipeline = load_classifier()
             embedder = load_embedder()
+            cross_enc = load_cross_encoder()
 
         with st.spinner("Extracting JD signals…"):
             jd_info = extract_jd(jd_text)
+
+        with st.spinner("Classifying JD sentences (first run downloads ~1.6 GB model)…"):
+            buckets = classify_jd(jd_text, pipeline=clf_pipeline)
+
+        # Build a focused "required-only" JD text for more accurate semantic scoring.
+        required_sents = [item["text"] for item in buckets.get("Required", [])]
+        required_jd_text = " ".join(required_sents) if required_sents else None
 
         with st.spinner("Scoring candidate fit…"):
             score_info = compute_fit_score(
                 jd_text, candidate_text,
                 jd_skills=jd_info["skills_and_tools"],
                 embedding_model=embedder,
+                required_jd_text=required_jd_text,
+                cross_encoder=cross_enc,
             )
-
-        with st.spinner("Classifying JD sentences (first run downloads ~1.6 GB model)…"):
-            buckets = classify_jd(jd_text, pipeline=clf_pipeline)
 
         st.divider()
         fit = score_info["fit_score"]
@@ -401,6 +413,18 @@ with tab_analyse:
                 )
         else:
             st.info("No specific tools/skills detected in the JD.")
+
+        if jd_info.get("unknown_tools"):
+            st.markdown("**Also detected in JD (not in core vocabulary):**")
+            st.markdown(
+                " ".join(
+                    f'<span style="background:#2563eb18;color:#2563eb;border:1px solid #2563eb44;'
+                    f'padding:4px 10px;border-radius:20px;margin:3px;display:inline-block;'
+                    f'font-size:.78rem;">{t}</span>'
+                    for t in jd_info["unknown_tools"]
+                ),
+                unsafe_allow_html=True,
+            )
 
         if jd_info.get("soft_skills"):
             st.markdown("**Soft skills in JD:**")
@@ -463,6 +487,7 @@ with tab_analyse:
                 "industry": jd_info["industry"],
                 "years_of_experience": jd_info["years_of_experience"],
                 "hard_skills": jd_info["skills_and_tools"],
+                "unknown_tools": jd_info.get("unknown_tools", []),
                 "soft_skills": jd_info.get("soft_skills", []),
             },
             "skill_analysis": {

@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from config import SCORE_WEIGHTS, SKILL_ALIASES
+from config import CROSS_ENCODER_MODEL, SCORE_WEIGHTS, SKILL_ALIASES
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,43 @@ def _model() -> Any:
     if _embedding_model is None:
         _embedding_model = get_embedding_model()
     return _embedding_model
+
+
+def get_cross_encoder() -> Any | None:
+    """Lazy-load the CrossEncoder model (~22 MB).
+
+    Returns None if the package or model is unavailable so callers can
+    fall back to the bi-encoder gracefully.
+    """
+    try:
+        from sentence_transformers import CrossEncoder
+        return CrossEncoder(CROSS_ENCODER_MODEL)
+    except Exception as exc:
+        logger.warning("CrossEncoder unavailable (%s) — falling back to bi-encoder", exc)
+        return None
+
+
+def _cross_encoder_score(
+    required_sentences: list[str],
+    candidate_text: str,
+    model: Any,
+) -> float:
+    """Score candidate fit against required JD sentences using a cross-encoder.
+
+    Each required sentence is scored independently against a truncated slice
+    of the candidate text to stay within the 512-token limit.  The mean of
+    the top-5 sigmoid-normalised logits is returned.
+    """
+    if not required_sentences:
+        return 0.0
+    candidate_trunc = candidate_text[:2500]
+    pairs = [(sent, candidate_trunc) for sent in required_sentences[:20]]
+    raw_scores = np.array(model.predict(pairs), dtype=float)
+    sigmoid_scores = 1.0 / (1.0 + np.exp(-raw_scores))
+    k = min(5, len(sigmoid_scores))
+    score = float(np.sort(sigmoid_scores)[-k:].mean())
+    logger.debug("Cross-encoder semantic score: %.1f%%", score * 100)
+    return score
 
 
 def _semantic_similarity(text_a: str, text_b: str, model: Any) -> float:
@@ -267,13 +304,16 @@ def compute_fit_score(
     candidate_text: str,
     jd_skills: list[str],
     embedding_model: Any = None,
+    required_jd_text: str | None = None,
+    cross_encoder: Any = None,
 ) -> dict[str, Any]:
     """Return composite fit score with per-dimension breakdown and keyword analysis.
 
     Pipeline:
       1. Clean candidate text (strip PDF noise lines < 4 words).
       2. Normalise candidate aliases (sklearn → scikit-learn, etc.) for skill matching.
-      3. Semantic similarity on cleaned texts.
+      3. Semantic similarity — cross-encoder on required sentences when available,
+         otherwise bi-encoder on required_jd_text or full JD text.
       4. Keyword score = 0.6 × TF-IDF cosine + 0.4 × CountVectorizer top-20 overlap.
       5. Skill classification → exact (1pt) + semantic (0.5pt) / total.
       6. Composite = 0.30 sem + 0.30 keyword + 0.40 skill.
@@ -300,8 +340,24 @@ def compute_fit_score(
     # Step 2 — alias normalisation for skill matching only
     candidate_for_skills = _normalize_aliases(candidate_clean)
 
-    # Step 3 — semantic similarity (cleaned texts, no alias substitution)
-    sem_score = _semantic_similarity(jd_text, candidate_clean, model)
+    # Step 3 — semantic similarity.
+    # Cross-encoder (when provided) scores each required sentence against the
+    # candidate independently, avoiding the averaging-out of a single document
+    # embedding.  Falls back to bi-encoder on required_jd_text or full JD text.
+    if cross_encoder is not None and required_jd_text:
+        required_sents = [
+            s.strip() for s in re.split(r"[.!?\n]", required_jd_text)
+            if len(s.strip()) > 10
+        ]
+        sem_score = _cross_encoder_score(
+            required_sents or [required_jd_text], candidate_clean, cross_encoder
+        )
+    else:
+        sem_score = _semantic_similarity(
+            required_jd_text if required_jd_text else jd_text,
+            candidate_clean,
+            model,
+        )
 
     # Step 4 — combined keyword score (use alias-normalised candidate so
     # "sklearn" counts toward "scikit-learn", "postgres" toward "postgresql")

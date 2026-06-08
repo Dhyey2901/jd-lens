@@ -4,6 +4,9 @@ from __future__ import annotations
 # ── Model identifiers ──────────────────────────────────────────────────────────
 ZERO_SHOT_MODEL = "facebook/bart-large-mnli"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+# Cross-encoder for pairwise JD/resume relevance scoring (~22 MB).
+# Used when required JD sentences are available; bi-encoder is the fallback.
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 # ── Zero-shot classification ───────────────────────────────────────────────────
 CANDIDATE_LABELS: list[str] = [
