@@ -349,11 +349,14 @@ with tab_analyse:
                 embedding_model=embedder,
             )
 
-        # Hiring signals — zero model overhead, pure rule-based
+        # Hiring signals — rule-based, zero model overhead
         fit = score_info["fit_score"]
         hiring = compute_hiring_signals(
             candidate_text,
             jd_soft_skills=jd_info.get("soft_skills", []),
+            jd_text=jd_text,
+            jd_skills=jd_info.get("skills_and_tools", []),
+            missing_skills=score_info["missing_skills"],
         )
         prediction = generate_prediction(
             jd_match=fit,
@@ -399,6 +402,14 @@ with tab_analyse:
                 f"color:{sig_color};margin-top:-18px;'>{hiring['grade']}</p>",
                 unsafe_allow_html=True,
             )
+            role_type = hiring.get("role_type", "general")
+            if role_type != "general":
+                role_label = role_type.replace("_", " ").title()
+                st.markdown(
+                    f"<p style='text-align:center;font-size:.75rem;color:#888;"
+                    f"margin-top:-6px;'>Weights calibrated for: <em>{role_label}</em></p>",
+                    unsafe_allow_html=True,
+                )
 
         # ── Prediction verdict ─────────────────────────────────────────────────
         p_color = prediction["color"]
@@ -435,6 +446,19 @@ with tab_analyse:
                     f"💡 Only **{hiring['quantified_lines']} bullet point(s)** contain measurable numbers. "
                     "Adding metrics (e.g. team size, scale, % improvement) is the single highest-ROI resume change."
                 )
+
+            top_bullets = score_info.get("top_bullets", [])
+            if top_bullets:
+                st.markdown("**Top resume lines for this JD:**")
+                for b in top_bullets:
+                    st.markdown(
+                        f"<div style='font-size:.84rem;padding:7px 12px;margin:4px 0;"
+                        f"border-left:3px solid #2563eb;background:#2563eb08;"
+                        f"border-radius:4px;'>{b['text']}"
+                        f"<span style='float:right;font-size:.75rem;color:#888;'>"
+                        f"{b['score']}% match</span></div>",
+                        unsafe_allow_html=True,
+                    )
 
         # ── JD signals ────────────────────────────────────────────────────────
         st.divider()

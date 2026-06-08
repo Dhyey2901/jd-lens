@@ -71,6 +71,65 @@ _ENROLLMENT_SIGNALS: frozenset[str] = frozenset({
     "graduating", "pursuing", "enrolled",
 })
 
+# ── Role detection ─────────────────────────────────────────────────────────────
+
+_ROLE_SIGNALS: dict[str, frozenset[str]] = {
+    "consulting": frozenset({
+        "stakeholder", "client", "strategy", "advisory", "engagement",
+        "transformation", "management consulting", "change management",
+        "deliverable", "consulting", "consultant",
+    }),
+    "data_engineering": frozenset({
+        "pipeline", "etl", "spark", "airflow", "kafka", "databricks",
+        "dbt", "orchestration", "data warehouse", "snowflake", "ingestion",
+        "streaming", "data lake", "batch processing",
+    }),
+    "data_analyst": frozenset({
+        "dashboard", "reporting", "insights", "tableau", "power bi",
+        "looker", "business intelligence", "kpi", "excel",
+        "visualis", "bi tool",
+    }),
+    "research_ml": frozenset({
+        "research", "publication", "paper", "experiment", "benchmark",
+        "fine-tuning", "pretraining", "arxiv", "phd", "llm",
+    }),
+    "software_engineering": frozenset({
+        "api", "backend", "microservice", "kubernetes", "infrastructure",
+        "ci/cd", "devops", "system design", "distributed systems",
+        "containeris",
+    }),
+}
+
+# Per-role dimension weights — all rows sum to 1.0.
+# skill_gap is held at ~0.17-0.18 across all roles since required-skill
+# coverage matters regardless of role type.
+_ROLE_WEIGHTS: dict[str, dict[str, float]] = {
+    "consulting": {
+        "impact": 0.18, "depth": 0.10, "deployment": 0.05,
+        "verbs": 0.22, "trajectory": 0.12, "soft_cov": 0.15, "skill_gap": 0.18,
+    },
+    "data_engineering": {
+        "impact": 0.18, "depth": 0.22, "deployment": 0.22,
+        "verbs": 0.10, "trajectory": 0.05, "soft_cov": 0.05, "skill_gap": 0.18,
+    },
+    "data_analyst": {
+        "impact": 0.25, "depth": 0.17, "deployment": 0.08,
+        "verbs": 0.13, "trajectory": 0.10, "soft_cov": 0.10, "skill_gap": 0.17,
+    },
+    "research_ml": {
+        "impact": 0.18, "depth": 0.27, "deployment": 0.08,
+        "verbs": 0.12, "trajectory": 0.12, "soft_cov": 0.05, "skill_gap": 0.18,
+    },
+    "software_engineering": {
+        "impact": 0.18, "depth": 0.22, "deployment": 0.17,
+        "verbs": 0.12, "trajectory": 0.07, "soft_cov": 0.07, "skill_gap": 0.17,
+    },
+    "general": {
+        "impact": 0.21, "depth": 0.16, "deployment": 0.10,
+        "verbs": 0.16, "trajectory": 0.09, "soft_cov": 0.10, "skill_gap": 0.18,
+    },
+}
+
 
 # ── Individual scorers ─────────────────────────────────────────────────────────
 
@@ -151,6 +210,35 @@ def _score_soft_coverage(candidate_text: str, jd_soft_skills: list[str]) -> floa
     return matched / len(jd_soft_skills)
 
 
+def detect_role_type(jd_text: str) -> str:
+    """Detect role category from JD text using keyword frequency.
+
+    Counts signal hits per category and returns the winner when it reaches
+    a minimum of 2 hits (to avoid noise from incidental word matches).
+    Falls back to 'general' when no category clears the threshold.
+    """
+    lower = jd_text.lower()
+    scores = {
+        role: sum(1 for sig in signals if sig in lower)
+        for role, signals in _ROLE_SIGNALS.items()
+    }
+    best = max(scores, key=scores.get)
+    return best if scores[best] >= 2 else "general"
+
+
+def _score_skill_gap(jd_skills: list[str], missing_skills: list[str] | None) -> float:
+    """Fraction of JD-required skills the candidate covers.
+
+    Returns 1.0 (neutral) when no JD skills are listed or when
+    missing_skills data is unavailable — avoids penalising in the
+    absence of information.  A candidate missing 4 of 8 skills → 0.5.
+    """
+    if not jd_skills or missing_skills is None:
+        return 1.0
+    present = max(len(jd_skills) - len(missing_skills), 0)
+    return present / len(jd_skills)
+
+
 # ── Prediction engine ──────────────────────────────────────────────────────────
 
 def generate_prediction(
@@ -229,14 +317,25 @@ def generate_prediction(
 def compute_hiring_signals(
     candidate_text: str,
     jd_soft_skills: list[str] | None = None,
+    jd_text: str | None = None,
+    jd_skills: list[str] | None = None,
+    missing_skills: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Compute hiring signal scores from resume text alone.
+    """Compute hiring signal scores, weighted for the detected role type.
 
-    Returns individual dimension scores, a composite hiring_signal_score,
-    and the count of quantified bullet points (the most actionable metric
-    for candidates to improve).
+    When jd_text is supplied the role category is detected and dimension
+    weights are adjusted accordingly — so the same resume scores differently
+    against a consulting JD vs a data-engineering JD.  jd_skills +
+    missing_skills feed the skill-gap dimension (7th).
+
+    All JD params are optional; omitting them falls back to 'general' weights
+    with neutral skill-gap scoring, preserving backward compatibility.
     """
     jd_soft_skills = jd_soft_skills or []
+    jd_skills = jd_skills or []
+
+    role_type = detect_role_type(jd_text) if jd_text else "general"
+    weights = _ROLE_WEIGHTS[role_type]
 
     impact, quantified_count = _score_impact(candidate_text)
     depth = _score_depth(candidate_text)
@@ -244,14 +343,16 @@ def compute_hiring_signals(
     verbs = _score_verbs(candidate_text)
     trajectory = _score_trajectory(candidate_text)
     soft_cov = _score_soft_coverage(candidate_text, jd_soft_skills)
+    skill_gap = _score_skill_gap(jd_skills, missing_skills)
 
     composite = (
-        0.25 * impact
-        + 0.20 * depth
-        + 0.15 * deployment
-        + 0.20 * verbs
-        + 0.10 * trajectory
-        + 0.10 * soft_cov
+        weights["impact"]     * impact
+        + weights["depth"]      * depth
+        + weights["deployment"] * deployment
+        + weights["verbs"]      * verbs
+        + weights["trajectory"] * trajectory
+        + weights["soft_cov"]   * soft_cov
+        + weights["skill_gap"]  * skill_gap
     )
 
     if composite >= 0.70:
@@ -264,13 +365,15 @@ def compute_hiring_signals(
     return {
         "hiring_signal_score": round(composite * 100, 1),
         "grade": grade,
+        "role_type": role_type,
         "breakdown": {
-            "Impact & Metrics":       round(impact * 100, 1),
-            "Project Depth":          round(depth * 100, 1),
-            "Deployment Evidence":    round(deployment * 100, 1),
-            "Action Verb Strength":   round(verbs * 100, 1),
-            "Learning Trajectory":    round(trajectory * 100, 1),
-            "Soft Skill Coverage":    round(soft_cov * 100, 1),
+            "Impact & Metrics":     round(impact * 100, 1),
+            "Project Depth":        round(depth * 100, 1),
+            "Deployment Evidence":  round(deployment * 100, 1),
+            "Action Verb Strength": round(verbs * 100, 1),
+            "Learning Trajectory":  round(trajectory * 100, 1),
+            "Soft Skill Coverage":  round(soft_cov * 100, 1),
+            "Skill Gap Coverage":   round(skill_gap * 100, 1),
         },
         "quantified_lines": quantified_count,
     }

@@ -298,6 +298,35 @@ def _tokenize_meaningful(tokens: set[str]) -> list[str]:
     return sorted(t for t in tokens if len(t) > 2 and not t.isdigit())
 
 
+def _bullet_alignment_scores(
+    jd_text: str,
+    candidate_text: str,
+    model: Any,
+    top_n: int = 3,
+) -> list[dict]:
+    """Return top N resume lines ranked by semantic similarity to the JD.
+
+    Splits the candidate text on newlines and sentence boundaries, drops
+    lines shorter than 25 chars (headers, dates, single words), then ranks
+    the remainder against the full JD using cosine similarity.
+    """
+    bullets = [
+        s.strip()
+        for s in re.split(r"\n|(?<=[.!?])\s+", candidate_text)
+        if len(s.strip()) > 25
+    ]
+    if not bullets:
+        return []
+    jd_emb = model.encode([jd_text], normalize_embeddings=True)
+    bullet_embs = model.encode(bullets, normalize_embeddings=True)
+    scores = cosine_similarity(bullet_embs, jd_emb).flatten()
+    top_idx = np.argsort(scores)[::-1][:top_n]
+    return [
+        {"text": bullets[i], "score": round(float(scores[i]) * 100, 1)}
+        for i in top_idx
+    ]
+
+
 # ── Result cache ──────────────────────────────────────────────────────────────
 # Keyed by SHA-256 of (jd_text, candidate_text, sorted jd_skills).
 # Model instances and required_jd_text are NOT part of the key — same inputs
@@ -415,6 +444,8 @@ def compute_fit_score(
         len(exact), len(semantic_match), len(missing),
     )
 
+    top_bullets = _bullet_alignment_scores(jd_text, candidate_clean, model)
+
     result = {
         "fit_score": round(composite * 100, 1),
         "score_breakdown": {
@@ -427,6 +458,7 @@ def compute_fit_score(
         "missing_skills": missing,
         "matched_keywords": _tokenize_meaningful(jd_tokens & candidate_tokens)[:60],
         "gap_keywords": _tokenize_meaningful(jd_tokens - candidate_tokens)[:60],
+        "top_bullets": top_bullets,
     }
 
     # Evict oldest entry when the cache is full (dict insertion order = LRU).

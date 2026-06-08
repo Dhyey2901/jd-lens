@@ -6,7 +6,9 @@ from signals import (
     _score_trajectory,
     _score_verbs,
     _score_soft_coverage,
+    _score_skill_gap,
     compute_hiring_signals,
+    detect_role_type,
     generate_prediction,
 )
 
@@ -166,9 +168,13 @@ class TestComputeHiringSignals:
         assert "breakdown" in result
         assert "quantified_lines" in result
 
-    def test_breakdown_has_six_dimensions(self):
+    def test_breakdown_has_seven_dimensions(self):
         result = compute_hiring_signals(STRONG_RESUME)
-        assert len(result["breakdown"]) == 6
+        assert len(result["breakdown"]) == 7
+
+    def test_skill_gap_dimension_present(self):
+        result = compute_hiring_signals(STRONG_RESUME)
+        assert "Skill Gap Coverage" in result["breakdown"]
 
     def test_score_in_valid_range(self):
         result = compute_hiring_signals(STRONG_RESUME)
@@ -197,3 +203,63 @@ class TestGeneratePrediction:
         for match, signal in [(80, 80), (30, 80), (70, 30), (20, 20), (50, 55)]:
             result = generate_prediction(match, signal, [])
             assert all(k in result for k in ("verdict", "icon", "color", "explanation"))
+
+
+class TestDetectRoleType:
+    def test_consulting_jd_detected(self):
+        jd = "Looking for a consultant to manage client stakeholder engagement and deliverables."
+        assert detect_role_type(jd) == "consulting"
+
+    def test_data_engineering_jd_detected(self):
+        jd = "Build and maintain data pipelines using Airflow, Kafka, and Spark on Snowflake."
+        assert detect_role_type(jd) == "data_engineering"
+
+    def test_data_analyst_jd_detected(self):
+        jd = "Create dashboards and reporting insights using Power BI and Tableau."
+        assert detect_role_type(jd) == "data_analyst"
+
+    def test_research_ml_jd_detected(self):
+        jd = "Conduct research and publish papers. PhD preferred. Run benchmarks and experiments."
+        assert detect_role_type(jd) == "research_ml"
+
+    def test_software_engineering_jd_detected(self):
+        jd = "Design backend API microservices and manage Kubernetes infrastructure and CI/CD."
+        assert detect_role_type(jd) == "software_engineering"
+
+    def test_generic_jd_falls_back_to_general(self):
+        jd = "We are hiring a motivated professional to join our growing team."
+        assert detect_role_type(jd) == "general"
+
+    def test_role_type_returned_in_compute_hiring_signals(self):
+        result = compute_hiring_signals(STRONG_RESUME, jd_text="Client stakeholder consultant advisory.")
+        assert result["role_type"] == "consulting"
+
+    def test_no_jd_defaults_to_general(self):
+        result = compute_hiring_signals(STRONG_RESUME)
+        assert result["role_type"] == "general"
+
+
+class TestScoreSkillGap:
+    def test_no_missing_skills_scores_one(self):
+        assert _score_skill_gap(["python", "sql", "aws"], []) == 1.0
+
+    def test_all_missing_scores_zero(self):
+        assert _score_skill_gap(["python", "sql", "aws"], ["python", "sql", "aws"]) == 0.0
+
+    def test_half_missing_scores_half(self):
+        assert _score_skill_gap(["a", "b", "c", "d"], ["a", "b"]) == 0.5
+
+    def test_no_jd_skills_returns_neutral(self):
+        assert _score_skill_gap([], ["python"]) == 1.0
+
+    def test_none_missing_returns_neutral(self):
+        assert _score_skill_gap(["python", "sql"], None) == 1.0
+
+    def test_skill_gap_lowers_signal_score(self):
+        all_present = compute_hiring_signals(
+            STRONG_RESUME, jd_skills=["python", "sql"], missing_skills=[]
+        )
+        half_missing = compute_hiring_signals(
+            STRONG_RESUME, jd_skills=["python", "sql", "aws", "kafka"], missing_skills=["aws", "kafka"]
+        )
+        assert all_present["hiring_signal_score"] >= half_missing["hiring_signal_score"]
