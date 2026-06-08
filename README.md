@@ -30,12 +30,17 @@ Paste any job description and a candidate profile — JD Lens extracts key signa
 | Feature | Technique | Detail |
 | --- | --- | --- |
 | **Skill & Tool Extraction** | Regex phrase matching | 80+ tools across languages, cloud, ML, DevOps |
+| **Unknown Tool Detection** | Context-phrase NLP | Catches tools not in core vocabulary via "experience with X" patterns |
 | **Seniority / Education / Work Type** | Keyword signals | Parsed directly from JD text |
 | **Sentence Classification** | Zero-shot NLI | `facebook/bart-large-mnli` → Required / Nice-to-Have / Responsibility / Company Info |
-| **Semantic Fit Score** | Sentence Transformers | `all-MiniLM-L6-v2` cosine similarity (50% weight) |
-| **Keyword Overlap Score** | TF-IDF bigram | scikit-learn (30% weight) |
-| **Skill Match Rate** | Regex hit-rate | Explicit tool coverage (20% weight) |
+| **Semantic Fit Score** | Cross-encoder + Sentence Transformers | `cross-encoder/ms-marco-MiniLM-L-6-v2` on Required sentences; bi-encoder fallback |
+| **Required-only Scoring** | Classifier-gated | Semantic score computed against Required sentences — not filler or company info |
+| **Keyword Overlap Score** | TF-IDF + CountVectorizer | 0.6 × TF-IDF cosine + 0.4 × unigram top-20 overlap (30% weight) |
+| **Skill Match Rate** | Regex + semantic embedding | Exact hit + 0.5 × semantic match over JD skills (40% weight) |
+| **Section-aware Chunking** | Header regex | Detects SKILLS / EXPERIENCE sections; prioritises skills section in blob fallback |
+| **Alias Normalisation** | Dictionary substitution | sklearn → scikit-learn, postgres → postgresql, etc. |
 | **Gap Analysis** | Set difference | Keyword and skill gaps surfaced clearly |
+| **Result Caching** | SHA-256 in-process cache | Repeated (JD, candidate, skills) triples skip all model inference |
 | **Downloadable Report** | JSON export | Full structured analysis per run |
 
 ---
@@ -45,13 +50,16 @@ Paste any job description and a candidate profile — JD Lens extracts key signa
 ```text
 jd-lens/
 ├── app.py              # Streamlit UI — model caching, charts, layout
+├── api.py              # FastAPI REST layer — /analyse + /health endpoints
 ├── config.py           # Central config — models, weights, vocabulary
-├── extractor.py        # Pure-regex JD signal extraction
+├── extractor.py        # Pure-regex JD signal extraction + unknown tool detection
 ├── classifier.py       # HuggingFace zero-shot sentence classification
-├── scorer.py           # Hybrid semantic + TF-IDF + skill fit scorer
+├── scorer.py           # Hybrid scorer: cross-encoder + TF-IDF + skill match + cache
+├── utils.py            # Multi-format document extraction (PDF, DOCX, TXT)
 ├── tests/
 │   ├── test_extractor.py
-│   └── test_scorer.py
+│   ├── test_scorer.py
+│   └── test_api.py
 ├── .github/workflows/
 │   └── ci.yml          # GitHub Actions — pytest + ruff on Python 3.11/3.12
 └── requirements.txt
@@ -60,10 +68,13 @@ jd-lens/
 ### Scoring formula
 
 ```text
-fit_score = 0.50 × semantic_similarity   (sentence-transformers)
-          + 0.30 × tfidf_similarity       (bigram TF-IDF cosine)
-          + 0.20 × skill_match_rate       (regex hit-rate over JD tools)
+fit_score = 0.30 × semantic_similarity   (cross-encoder on Required sentences; bi-encoder fallback)
+          + 0.30 × keyword_overlap        (0.6 × TF-IDF cosine + 0.4 × top-20 unigram overlap)
+          + 0.40 × skill_match_rate       (exact hit × 1.0 + semantic hit × 0.5, over JD skills)
 ```
+
+When no skills are detected in the JD (e.g. unusually formatted), the 40% skill weight is
+redistributed proportionally to semantic and keyword so scores stay meaningful.
 
 ---
 
@@ -106,9 +117,10 @@ Streamlit Cloud installs `requirements.txt` automatically. Allow ~3 minutes for 
 ## Tech Stack
 
 - [Streamlit](https://streamlit.io) — UI & deployment
-- [sentence-transformers](https://www.sbert.net/) — semantic similarity
+- [sentence-transformers](https://www.sbert.net/) — bi-encoder + cross-encoder scoring
 - [HuggingFace Transformers](https://huggingface.co/facebook/bart-large-mnli) — zero-shot classification
-- [scikit-learn](https://scikit-learn.org/) — TF-IDF vectorisation
+- [scikit-learn](https://scikit-learn.org/) — TF-IDF + CountVectorizer keyword overlap
+- [FastAPI](https://fastapi.tiangolo.com/) — REST API layer
 - [Plotly](https://plotly.com/python/) — interactive charts
 
 ---
