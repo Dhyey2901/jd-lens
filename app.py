@@ -338,7 +338,6 @@ with tab_analyse:
         with st.spinner("Loading models…"):
             clf_pipeline = load_classifier()
             embedder = load_embedder()
-            cross_enc = load_cross_encoder()
 
         with st.spinner("Extracting JD signals…"):
             jd_info = extract_jd(jd_text)
@@ -347,6 +346,7 @@ with tab_analyse:
             buckets = classify_jd(jd_text, pipeline=clf_pipeline)
 
         # Build a focused "required-only" JD text for more accurate semantic scoring.
+        # Passed to bi-encoder so scoring ignores filler / company-info sentences.
         required_sents = [item["text"] for item in buckets.get("Required", [])]
         required_jd_text = " ".join(required_sents) if required_sents else None
 
@@ -356,7 +356,8 @@ with tab_analyse:
                 jd_skills=jd_info["skills_and_tools"],
                 embedding_model=embedder,
                 required_jd_text=required_jd_text,
-                cross_encoder=cross_enc,
+                # cross_encoder intentionally omitted: ms-marco is a search-relevance
+                # model, not a semantic similarity model — it underscores resumes vs JDs.
             )
 
         st.divider()

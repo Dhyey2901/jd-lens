@@ -43,6 +43,14 @@ _CONTEXT_NOISE: frozenset[str] = frozenset({
     "distributed", "cloud", "backend", "frontend", "fullstack", "full",
     "stack", "data", "enterprise", "production", "open", "source", "based",
     "driven", "oriented", "native",
+    # Office suite / soft-skill words that appear after context phrases
+    "microsoft", "office", "excel", "word", "powerpoint", "suite",
+    "attention", "detail", "written", "verbal", "interpersonal",
+    "cross", "functional", "analytical", "critical", "detail",
+    # Generic adjectives / nouns that aren't tools
+    "complex", "technical", "business", "industry", "domain", "sector",
+    "relevant", "related", "similar", "equivalent", "comparable",
+    "hands", "real", "world", "practical", "working",
 })
 
 
