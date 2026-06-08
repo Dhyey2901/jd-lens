@@ -11,6 +11,7 @@ from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
 from extractor import extract_jd
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
+from signals import compute_hiring_signals, generate_prediction
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
 
 # ── Sample data ────────────────────────────────────────────────────────────────
@@ -348,33 +349,104 @@ with tab_analyse:
                 embedding_model=embedder,
             )
 
-        st.divider()
+        # Hiring signals — zero model overhead, pure rule-based
         fit = score_info["fit_score"]
+        hiring = compute_hiring_signals(
+            candidate_text,
+            jd_soft_skills=jd_info.get("soft_skills", []),
+        )
+        prediction = generate_prediction(
+            jd_match=fit,
+            signal_score=hiring["hiring_signal_score"],
+            missing_skills=score_info["missing_skills"],
+        )
 
-        # ── Gauge + JD signals ─────────────────────────────────────────────────
-        col_signals, col_gauge = st.columns([3, 2])
+        st.divider()
 
-        with col_gauge:
+        # ── Dual score header ──────────────────────────────────────────────────
+        col_jd_gauge, col_sig_gauge = st.columns(2)
+
+        with col_jd_gauge:
+            st.markdown(
+                "<p style='text-align:center;font-size:.85rem;"
+                "color:#888;margin-bottom:-8px;'>JD Match Score</p>",
+                unsafe_allow_html=True,
+            )
             st.plotly_chart(
                 _gauge_chart(fit), use_container_width=True,
                 config={"displayModeBar": False},
             )
             st.markdown(
-                f"<p style='text-align:center;font-size:1.1rem;color:{_score_color(fit)};margin-top:-18px;'>"
-                f"{_score_grade(fit)}</p>",
+                f"<p style='text-align:center;font-size:1.05rem;"
+                f"color:{_score_color(fit)};margin-top:-18px;'>{_score_grade(fit)}</p>",
                 unsafe_allow_html=True,
             )
 
-        with col_signals:
-            st.subheader("JD Signals")
-            r1c1, r1c2 = st.columns(2)
-            r1c1.metric("Seniority", jd_info["seniority"].title())
-            r1c2.metric("Education", jd_info["education"].title())
-            r2c1, r2c2 = st.columns(2)
-            r2c1.metric("Work Type", jd_info["work_type"].title())
-            r2c2.metric("Industry", jd_info["industry"].title())
-            exp = ", ".join(jd_info["years_of_experience"]) or "Not specified"
-            st.metric("Experience Required", exp)
+        with col_sig_gauge:
+            sig = hiring["hiring_signal_score"]
+            sig_color = "#2ecc71" if sig >= 70 else "#f39c12" if sig >= 50 else "#e74c3c"
+            st.markdown(
+                "<p style='text-align:center;font-size:.85rem;"
+                "color:#888;margin-bottom:-8px;'>Hiring Signal Score</p>",
+                unsafe_allow_html=True,
+            )
+            st.plotly_chart(
+                _gauge_chart(sig), use_container_width=True,
+                config={"displayModeBar": False},
+            )
+            st.markdown(
+                f"<p style='text-align:center;font-size:1.05rem;"
+                f"color:{sig_color};margin-top:-18px;'>{hiring['grade']}</p>",
+                unsafe_allow_html=True,
+            )
+
+        # ── Prediction verdict ─────────────────────────────────────────────────
+        p_color = prediction["color"]
+        st.markdown(
+            f"""<div style="border-left:5px solid {p_color};padding:14px 20px;
+            border-radius:6px;background:{p_color}12;margin:12px 0;">
+            <span style="font-size:1.4rem;">{prediction['icon']}</span>&nbsp;
+            <strong style="font-size:1.05rem;color:{p_color};">{prediction['verdict']}</strong>
+            <p style="margin:6px 0 0;font-size:.9rem;color:#ccc;">{prediction['explanation']}</p>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        # ── Hiring signal breakdown ────────────────────────────────────────────
+        with st.expander("Hiring Signal breakdown", expanded=False):
+            st.caption(
+                "Measures quality signals that experienced recruiters screen for, "
+                "independent of JD keyword matching."
+            )
+            for dim, val in hiring["breakdown"].items():
+                bar_color = "#2ecc71" if val >= 70 else "#f39c12" if val >= 45 else "#e74c3c"
+                st.markdown(
+                    f"<div style='font-size:.83rem;margin-bottom:3px;'>"
+                    f"<span style='color:#aaa;'>{dim}</span>"
+                    f"<span style='float:right;font-weight:600;color:{bar_color};'>{val}%</span>"
+                    f"</div>"
+                    f"<div style='background:#333;border-radius:4px;height:6px;margin-bottom:10px;'>"
+                    f"<div style='background:{bar_color};width:{min(val,100)}%;height:6px;border-radius:4px;'>"
+                    f"</div></div>",
+                    unsafe_allow_html=True,
+                )
+            if hiring["quantified_lines"] < 3:
+                st.info(
+                    f"💡 Only **{hiring['quantified_lines']} bullet point(s)** contain measurable numbers. "
+                    "Adding metrics (e.g. team size, scale, % improvement) is the single highest-ROI resume change."
+                )
+
+        # ── JD signals ────────────────────────────────────────────────────────
+        st.divider()
+        st.subheader("JD Signals")
+        r1c1, r1c2 = st.columns(2)
+        r1c1.metric("Seniority", jd_info["seniority"].title())
+        r1c2.metric("Education", jd_info["education"].title())
+        r2c1, r2c2 = st.columns(2)
+        r2c1.metric("Work Type", jd_info["work_type"].title())
+        r2c2.metric("Industry", jd_info["industry"].title())
+        exp = ", ".join(jd_info["years_of_experience"]) or "Not specified"
+        st.metric("Experience Required", exp)
 
         # ── Colour-coded skill tags ────────────────────────────────────────────
         st.divider()
