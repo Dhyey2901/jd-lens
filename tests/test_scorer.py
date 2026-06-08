@@ -1,6 +1,7 @@
 """Unit tests for scorer.py — pure logic tests, no model calls."""
 import pytest
-from scorer import _tfidf_similarity, _tokenize
+
+from scorer import _detect_resume_sections, _get_skills_section, _tfidf_similarity, _tokenize
 
 
 class TestTokenize:
@@ -24,6 +25,43 @@ class TestTokenize:
         tokens = _tokenize("working with c++ and node.js daily")
         assert "c++" in tokens
         assert "node.js" in tokens
+
+
+class TestDetectResumeSections:
+    RESUME_WITH_SECTIONS = (
+        "TECHNICAL SKILLS\nPython, JavaScript, React, PostgreSQL\n\n"
+        "EXPERIENCE\nSoftware Engineer at Acme Corp 2020-2024\n\n"
+        "EDUCATION\nBSc Computer Science, University of Melbourne"
+    )
+    RESUME_BLOB = "Python developer with 5 years experience at Google building ML systems."
+
+    def test_detects_skills_section(self):
+        sections = _detect_resume_sections(self.RESUME_WITH_SECTIONS)
+        skill_key = next((k for k in sections if "skill" in k), None)
+        assert skill_key is not None
+
+    def test_skills_section_contains_tools(self):
+        sections = _detect_resume_sections(self.RESUME_WITH_SECTIONS)
+        skills_text = _get_skills_section(sections)
+        assert skills_text is not None
+        assert "python" in skills_text.lower()
+
+    def test_detects_experience_section(self):
+        sections = _detect_resume_sections(self.RESUME_WITH_SECTIONS)
+        assert any("experience" in k for k in sections)
+
+    def test_returns_empty_for_blob(self):
+        sections = _detect_resume_sections(self.RESUME_BLOB)
+        assert sections == {}
+
+    def test_get_skills_section_returns_none_when_absent(self):
+        sections = {"experience": "5 years at Google", "education": "BSc CS"}
+        assert _get_skills_section(sections) is None
+
+    def test_section_content_stripped(self):
+        sections = _detect_resume_sections(self.RESUME_WITH_SECTIONS)
+        for content in sections.values():
+            assert content == content.strip()
 
 
 class TestTfidfSimilarity:

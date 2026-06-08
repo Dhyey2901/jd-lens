@@ -19,6 +19,24 @@ _SEMANTIC_SKILL_THRESHOLD = 0.52
 # Top N JD keywords to check for presence in candidate text.
 _KEYWORD_TOP_N = 20
 
+# Common resume section header patterns.
+_SECTION_HEADER_RE = re.compile(
+    r"^(TECHNICAL\s+SKILLS?|SKILLS?|CORE\s+SKILLS?|COMPETENCIES|TECHNOLOGIES|"
+    r"KEY\s+SKILLS?|TOOLS?\s*[&]+\s*TECHNOLOGIES?|TECH\s+STACK|"
+    r"WORK\s+EXPERIENCE|PROFESSIONAL\s+EXPERIENCE|EXPERIENCE|EMPLOYMENT\s+HISTORY|"
+    r"EDUCATION|PROJECTS?|PERSONAL\s+PROJECTS?|"
+    r"CERTIFICATIONS?|CERTIFICATES?|TRAINING|COURSES?|"
+    r"SUMMARY|PROFESSIONAL\s+SUMMARY|PROFILE|OBJECTIVE|ABOUT\s*ME?)\s*:?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# Keys that identify the skills section when scanning section names.
+_SKILLS_SECTION_KEYS: frozenset[str] = frozenset({
+    "skills", "technical skills", "core skills", "competencies",
+    "technologies", "key skills", "tools & technologies",
+    "tools and technologies", "tech stack", "technical competencies",
+})
+
 # Minimum words per line when cleaning resume noise.
 _RESUME_MIN_WORDS = 4
 
@@ -46,6 +64,38 @@ def _normalize_aliases(text: str) -> str:
     for alias, canonical in SKILL_ALIASES.items():
         result = re.sub(r"\b" + re.escape(alias) + r"\b", canonical, result)
     return result
+
+
+# ── Section detection ─────────────────────────────────────────────────────────
+
+def _detect_resume_sections(text: str) -> dict[str, str]:
+    """Split a resume into named sections using common header patterns.
+
+    Returns {normalised_section_name: section_content}.
+    Returns an empty dict when no recognisable headers are found (blob text).
+    """
+    headers = list(_SECTION_HEADER_RE.finditer(text))
+    if not headers:
+        return {}
+
+    sections: dict[str, str] = {}
+    for i, match in enumerate(headers):
+        name = match.group(0).strip().rstrip(":").strip().lower()
+        start = match.end()
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
+        content = text[start:end].strip()
+        if content:
+            sections[name] = content
+
+    return sections
+
+
+def _get_skills_section(sections: dict[str, str]) -> str | None:
+    """Return the content of the skills/technologies section, or None."""
+    for key, content in sections.items():
+        if any(sk in key for sk in _SKILLS_SECTION_KEYS):
+            return content
+    return None
 
 
 # ── Similarity functions ───────────────────────────────────────────────────────
@@ -157,20 +207,35 @@ def _classify_skills(
     chunks = [s.strip() for s in re.split(r"[.\n,;]", candidate_text) if len(s.strip()) > 8]
 
     # Fallback for PDF blobs — text with stripped punctuation gives ≤ 2 chunks,
-    # making skill-level semantic matching unreliable. Use a sliding word window
-    # instead so every ~40-word region gets its own embedding.
+    # making skill-level semantic matching unreliable.  When a SKILLS section is
+    # detectable, prepend its fine-grained splits as priority chunks so skill terms
+    # get their own embeddings.  Otherwise fall back to a sliding word window.
     if len(chunks) < 3:
+        sections = _detect_resume_sections(candidate_text)
+        skills_text = _get_skills_section(sections)
         words = candidate_text.split()
         chunk_size, step = 40, 25
-        chunks = [
+        window_chunks = [
             " ".join(words[i: i + chunk_size])
             for i in range(0, len(words), step)
             if " ".join(words[i: i + chunk_size]).strip()
         ]
-        logger.debug(
-            "Blob fallback: produced %d word-window chunks from %d words",
-            len(chunks), len(words),
-        )
+        if skills_text:
+            skill_chunks = [
+                s.strip() for s in re.split(r"[.\n,;|•\-]", skills_text)
+                if len(s.strip()) > 4
+            ]
+            chunks = skill_chunks + window_chunks
+            logger.debug(
+                "Blob fallback: %d skills-section chunks + %d windows",
+                len(skill_chunks), len(window_chunks),
+            )
+        else:
+            chunks = window_chunks
+            logger.debug(
+                "Blob fallback: %d word-window chunks from %d words",
+                len(chunks), len(words),
+            )
 
     if not chunks:
         chunks = [candidate_text]
