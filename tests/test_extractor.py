@@ -6,6 +6,7 @@ from extractor import (
     extract_seniority,
     extract_skills_and_tools,
     extract_soft_skills,
+    extract_unknown_tools,
     extract_work_type,
     extract_years_of_experience,
 )
@@ -129,12 +130,46 @@ class TestIndustry:
         assert extract_industry("Looking for a Python developer") == "general tech"
 
 
+class TestUnknownTools:
+    def test_detects_context_tool(self):
+        result = extract_unknown_tools("We need experience with Temporal for workflow orchestration")
+        assert "temporal" in result
+
+    def test_detects_multiple(self):
+        result = extract_unknown_tools(
+            "Proficiency in Polars required. Familiarity with Prefect a plus."
+        )
+        assert "polars" in result
+        assert "prefect" in result
+
+    def test_ignores_known_tools(self):
+        result = extract_unknown_tools("Proficiency in Python and AWS required")
+        assert "python" not in result
+        assert "aws" not in result
+
+    def test_filters_common_words(self):
+        result = extract_unknown_tools("Experience with the latest technologies in cloud")
+        assert "the" not in result
+        assert "latest" not in result
+        assert "cloud" not in result
+
+    def test_returns_sorted(self):
+        result = extract_unknown_tools(
+            "Experience with Prefect. Familiarity with Polars. Background in Ray."
+        )
+        assert result == sorted(result)
+
+    def test_empty_for_no_tech_context(self):
+        result = extract_unknown_tools("We are a great company with amazing benefits and culture.")
+        assert result == []
+
+
 class TestExtractJd:
     def test_full_output_keys(self):
         result = extract_jd(JD_SAMPLE)
         assert set(result.keys()) == {
-            "skills_and_tools", "soft_skills", "years_of_experience",
-            "seniority", "education", "work_type", "industry",
+            "skills_and_tools", "unknown_tools", "soft_skills",
+            "years_of_experience", "seniority", "education", "work_type", "industry",
         }
 
     def test_integration_senior(self):
