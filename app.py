@@ -59,6 +59,54 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Global font ── */
+  html, body, [class*="css"], .stMarkdown, .stTextArea textarea,
+  .stTextInput input, .stSelectbox, button { font-family: 'Inter', sans-serif !important; }
+
+  /* ── Headings ── */
+  h1 { font-weight: 700 !important; letter-spacing: -0.5px !important; }
+  h2, h3 { font-weight: 600 !important; letter-spacing: -0.3px !important; }
+
+  /* ── Section cards — wrap heavy content blocks ── */
+  .jdl-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 8px 0 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+
+  /* ── Subtle dividers (replace the full-width heavy lines) ── */
+  hr { border-color: #E2E8F0 !important; margin: 20px 0 !important; }
+
+  /* ── Metric labels — smaller, muted ── */
+  [data-testid="stMetricLabel"] { font-size: .78rem !important; color: #64748B !important; }
+  [data-testid="stMetricValue"] { font-size: 1.15rem !important; font-weight: 600 !important; }
+
+  /* ── Primary button ── */
+  .stButton > button[kind="primary"] {
+    font-weight: 600 !important;
+    letter-spacing: .01em !important;
+    border-radius: 8px !important;
+  }
+
+  /* ── Tabs — bolder active label ── */
+  [data-baseweb="tab"] { font-weight: 500 !important; }
+
+  /* ── Skill pill hover — subtle lift ── */
+  span[style*="border-radius:20px"]:hover { opacity: .85; }
+
+  /* ── Remove default top padding on main block ── */
+  .block-container { padding-top: 2rem !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── Model loading (cached across sessions) ─────────────────────────────────────
 
 @st.cache_resource(show_spinner=False)
@@ -117,17 +165,25 @@ def _gauge_chart(score: float) -> go.Figure:
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score,
-        number={"suffix": "%", "font": {"size": 52, "color": color}},
+        number={"suffix": "%", "font": {"size": 48, "color": color, "family": "Inter"}},
         gauge={
-            "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#555"},
-            "bar": {"color": color, "thickness": 0.28},
+            "axis": {
+                "range": [0, 100],
+                "tickwidth": 0,
+                "tickcolor": "rgba(0,0,0,0)",
+                "tickfont": {"color": "rgba(0,0,0,0)"},
+                "showticklabels": False,
+            },
+            "bar": {"color": color, "thickness": 0.3},
+            "bgcolor": "rgba(0,0,0,0)",
+            "borderwidth": 0,
             "steps": [
-                {"range": [0, 40],  "color": "rgba(231,76,60,0.12)"},
-                {"range": [40, 65], "color": "rgba(243,156,18,0.12)"},
-                {"range": [65, 100],"color": "rgba(46,204,113,0.12)"},
+                {"range": [0, 40],  "color": "rgba(231,76,60,0.10)"},
+                {"range": [40, 65], "color": "rgba(243,156,18,0.10)"},
+                {"range": [65, 100],"color": "rgba(46,204,113,0.10)"},
             ],
             "threshold": {
-                "line": {"color": color, "width": 4},
+                "line": {"color": color, "width": 3},
                 "thickness": 0.75,
                 "value": score,
             },
@@ -135,9 +191,11 @@ def _gauge_chart(score: float) -> go.Figure:
         domain={"x": [0, 1], "y": [0, 1]},
     ))
     fig.update_layout(
-        height=240,
-        margin=dict(l=20, r=20, t=30, b=10),
+        height=220,
+        margin=dict(l=20, r=20, t=20, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"family": "Inter"},
     )
     return fig
 
@@ -222,7 +280,8 @@ def _breakdown_chart(breakdown: dict[str, float]) -> go.Figure:
         xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
         yaxis=dict(autorange="reversed"),
         margin=dict(l=10, r=60, t=10, b=10), height=160,
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(size=13),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(size=13, family="Inter"),
     )
     return fig
 
@@ -247,6 +306,7 @@ def _classification_pie(buckets: dict[str, list]) -> go.Figure:
     fig.update_layout(
         height=240, margin=dict(l=0, r=0, t=10, b=10),
         showlegend=False, paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter"),
     )
     return fig
 
@@ -335,8 +395,15 @@ def _handle_upload(
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.title("🔍 JD Lens")
-st.caption("NLP-powered Job Description Analyser & Role-Fit Scorer")
+st.markdown("""
+<div style="padding:28px 0 8px;">
+  <h1 style="font-size:2rem;font-weight:700;letter-spacing:-.5px;margin:0;">🔍 JD Lens</h1>
+  <p style="font-size:1rem;color:#64748B;margin:6px 0 0;font-weight:400;">
+    AI-powered resume scorer for IT &amp; tech hiring —
+    JD-match score, hiring signals, skill gaps, and keyword analysis in seconds.
+  </p>
+</div>
+""", unsafe_allow_html=True)
 
 with st.expander("ℹ️ How it works", expanded=False):
     st.markdown("""
