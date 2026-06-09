@@ -139,10 +139,10 @@ class TestUnknownTools:
 
     def test_detects_multiple(self):
         result = extract_unknown_tools(
-            "Proficiency in Polars required. Familiarity with Prefect a plus."
+            "Proficiency in Chronos required. Familiarity with Nemo a plus."
         )
-        assert "polars" in result
-        assert "prefect" in result
+        assert "chronos" in result
+        assert "nemo" in result
 
     def test_ignores_known_tools(self):
         result = extract_unknown_tools("Proficiency in Python and AWS required")

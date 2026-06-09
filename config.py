@@ -1,6 +1,11 @@
 """Central configuration — models, labels, weights, and vocabulary lists."""
 from __future__ import annotations
 
+# ── Input validation limits ────────────────────────────────────────────────────
+MAX_CHARS = 20_000          # max characters for JD or resume text
+MAX_FILE_SIZE_MB = 5        # max upload size in megabytes
+MIN_RESUME_WORDS = 30       # reject extractions shorter than this (scanned/empty files)
+
 # ── Model identifiers ──────────────────────────────────────────────────────────
 ZERO_SHOT_MODEL = "facebook/bart-large-mnli"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -200,4 +205,9 @@ KNOWN_TOOLS: list[str] = [
     # Tooling & Practices
     "git", "github", "gitlab", "bitbucket", "jira", "confluence",
     "agile", "scrum", "ci/cd", "linux", "bash", "shell", "sql", "nosql",
+    # Modern data / ML tooling (post-2022)
+    "duckdb", "polars", "ray", "modal", "wandb", "prefect", "dagster",
+    "great expectations", "dbt", "metaflow", "bentoml", "vllm", "ollama",
+    "lancedb", "qdrant", "milvus", "llamaindex", "crewai", "autogen",
+    "feast", "tecton", "vertex ai", "sagemaker", "databricks",
 ]

@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from classifier import classify_jd, get_pipeline
-from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
+from config import EMBEDDING_MODEL, MAX_CHARS, MAX_FILE_SIZE_MB, MIN_RESUME_WORDS, ZERO_SHOT_MODEL
 from extractor import extract_jd, extract_skills_and_tools, extract_soft_skills, extract_unknown_tools
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from signals import compute_hiring_signals, generate_prediction
@@ -77,6 +77,28 @@ def load_cross_encoder():
 
 
 # ── Visual helpers ─────────────────────────────────────────────────────────────
+
+# Abbreviations that str.title() would mangle (e.g. "ai" → "Ai")
+_INDUSTRY_ABBREV = {"ai", "saas", "b2b", "ehr", "fhir", "d2c", "wfh"}
+
+def _display_industry(raw: str) -> str:
+    """Title-case an industry string while preserving uppercase abbreviations."""
+    def _cap(word: str) -> str:
+        return word.upper() if word.lower() in _INDUSTRY_ABBREV else word.capitalize()
+    return " ".join(_cap(w) for w in raw.replace("/", "/ ").split())
+
+
+def _char_counter(text: str, limit: int = MAX_CHARS) -> None:
+    """Render a subtle character counter below a text area."""
+    used = len(text)
+    pct = used / limit
+    color = "#e74c3c" if pct > 0.9 else "#f39c12" if pct > 0.7 else "#888"
+    st.markdown(
+        f"<p style='font-size:.72rem;color:{color};text-align:right;"
+        f"margin-top:-14px;'>{used:,} / {limit:,} chars</p>",
+        unsafe_allow_html=True,
+    )
+
 
 def _score_color(score: float) -> str:
     if score >= 65:
@@ -282,21 +304,29 @@ def _handle_upload(
         key=uploader_key,
     )
     if uploaded is not None:
+        file_bytes = uploaded.read()
+        size_mb = len(file_bytes) / (1024 * 1024)
+        if size_mb > MAX_FILE_SIZE_MB:
+            st.error(
+                f"File is {size_mb:.1f} MB — maximum allowed is {MAX_FILE_SIZE_MB} MB. "
+                "Try a smaller file or paste the text directly."
+            )
+            return
         try:
-            text = extract_text_from_file(uploaded.read(), uploaded.name)
-            if text:
+            text = extract_text_from_file(file_bytes, uploaded.name)
+            word_count = len(text.split())
+            if not text or word_count < MIN_RESUME_WORDS:
+                st.warning(
+                    f"Only {word_count} word(s) extracted. "
+                    "PDFs with scanned images need OCR — try a DOCX or TXT version, "
+                    "or paste the text directly."
+                )
+            else:
                 st.session_state[session_key] = text
-                word_count = len(text.split())
                 ext = uploaded.name.rsplit(".", 1)[-1].upper()
                 st.success(f"Extracted {word_count:,} words from **{uploaded.name}** ({ext})")
                 with st.expander("Preview extracted text", expanded=False):
                     st.text(text[:1500] + ("…" if len(text) > 1500 else ""))
-            else:
-                st.warning(
-                    "No text found in this file. "
-                    "PDFs with scanned images need OCR — try copying the text manually, "
-                    "or use a DOCX/TXT version for best results."
-                )
         except ValueError as e:
             st.error(str(e))
         except Exception as e:
@@ -312,9 +342,11 @@ with st.expander("ℹ️ How it works", expanded=False):
     st.markdown("""
 | Step | Model | What it does |
 | --- | --- | --- |
-| Extraction | Regex | Hard skills, soft skills, seniority, education, industry, work type |
-| Scoring | `all-MiniLM-L6-v2` + TF-IDF | Semantic (50%) + keyword (30%) + skill hit-rate (20%) |
-| Classification | `facebook/bart-large-mnli` | Buckets each JD sentence: Required / Nice-to-Have / Responsibility / Company Info |
+| **JD Extraction** | Regex | Skills, soft skills, seniority, education, industry, work type, section weights |
+| **JD-Match Score** | `all-MiniLM-L6-v2` + TF-IDF | 30% semantic · 30% keyword overlap (bigrams) · 40% skill match rate |
+| **Hiring Signal Score** | Rule-based | 7 dimensions: impact, depth, deployment, verbs, trajectory, soft skills, skill gap |
+| **Four-Quadrant Verdict** | Score axes | Strong Candidate / Overlooked Gem / Keyword Match–Verify Depth / Significant Gaps |
+| **Sentence Classification** | `facebook/bart-large-mnli` | Required / Nice-to-Have / Responsibility / Company Info |
     """)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
@@ -344,6 +376,7 @@ with tab_analyse:
             label_visibility="collapsed",
             key="jd_text",
         )
+        _char_counter(jd_text)
 
     with col_cand:
         st.subheader("Candidate Profile")
@@ -355,10 +388,10 @@ with tab_analyse:
             label_visibility="collapsed",
             key="candidate_text",
         )
+        _char_counter(candidate_text)
 
     analyse = st.button("Analyse ✨", type="primary", use_container_width=True)
 
-    MAX_CHARS = 20_000
     if analyse:
         if not jd_text.strip() or not candidate_text.strip():
             st.error("Please provide both a job description and a candidate profile.")
@@ -520,7 +553,7 @@ with tab_analyse:
         r1c2.metric("Education", jd_info["education"].title())
         r2c1, r2c2 = st.columns(2)
         r2c1.metric("Work Type", jd_info["work_type"].title())
-        r2c2.metric("Industry", jd_info["industry"].title())
+        r2c2.metric("Industry", _display_industry(jd_info["industry"]))
         exp = ", ".join(jd_info["years_of_experience"]) or "Not specified"
         st.metric("Experience Required", exp)
 
