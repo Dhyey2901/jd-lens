@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import plotly.graph_objects as go
@@ -9,7 +10,7 @@ import streamlit as st
 
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
-from extractor import extract_jd
+from extractor import extract_jd, extract_skills_and_tools, extract_soft_skills
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from signals import compute_hiring_signals, generate_prediction
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
@@ -143,6 +144,39 @@ def _skill_tags_html(
             f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;font-size:.82rem;">'
             f'✗ {s}</span>'
         )
+    return "".join(parts)
+
+
+def _candidate_skill_tags_html(skills: list[str], extra: bool = False) -> str:
+    color = "#10b981" if not extra else "#6366f1"
+    return "".join(
+        f'<span style="background:{color}18;color:{color};border:1px solid {color}44;'
+        f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;font-size:.82rem;">'
+        f'{s}</span>'
+        for s in skills
+    )
+
+
+def _soft_skill_coverage_html(
+    jd_soft: list[str],
+    candidate_text: str,
+) -> str:
+    """Render JD soft skills with ✓/✗ indicating presence in candidate text."""
+    parts = []
+    for skill in jd_soft:
+        found = bool(re.search(r"\b" + re.escape(skill) + r"\b", candidate_text, re.IGNORECASE))
+        if found:
+            parts.append(
+                f'<span style="background:#2ecc7118;color:#2ecc71;border:1px solid #2ecc7144;'
+                f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;'
+                f'font-size:.82rem;">✓ {skill}</span>'
+            )
+        else:
+            parts.append(
+                f'<span style="background:#e74c3c18;color:#e74c3c;border:1px solid #e74c3c44;'
+                f'padding:4px 12px;border-radius:20px;margin:3px;display:inline-block;'
+                f'font-size:.82rem;">✗ {skill}</span>'
+            )
     return "".join(parts)
 
 
@@ -349,6 +383,10 @@ with tab_analyse:
                 embedding_model=embedder,
             )
 
+        # Extract skills/soft-skills directly from the candidate resume
+        candidate_hard_skills = extract_skills_and_tools(candidate_text)
+        candidate_soft_skills = extract_soft_skills(candidate_text)
+
         # Hiring signals — rule-based, zero model overhead
         fit = score_info["fit_score"]
         hiring = compute_hiring_signals(
@@ -483,48 +521,108 @@ with tab_analyse:
         exp = ", ".join(jd_info["years_of_experience"]) or "Not specified"
         st.metric("Experience Required", exp)
 
-        # ── Colour-coded skill tags ────────────────────────────────────────────
+        # ── Skill Coverage ─────────────────────────────────────────────────────
         st.divider()
         st.subheader("Skill Coverage")
-        if jd_info["skills_and_tools"]:
-            st.markdown(
-                _skill_tags_html(
-                    score_info["matched_skills"],
-                    score_info.get("semantic_skills", []),
-                    score_info["missing_skills"],
-                ),
-                unsafe_allow_html=True,
-            )
-            m = len(score_info["matched_skills"])
-            s = len(score_info.get("semantic_skills", []))
-            g = len(score_info["missing_skills"])
-            st.caption(
-                f"✅ {m} exact &nbsp;·&nbsp; ≈ {s} semantic &nbsp;·&nbsp; "
-                f"❌ {g} missing &nbsp;·&nbsp; {m + s + g} total"
-            )
-            if s:
-                st.caption(
-                    "≈ Semantic matches: candidate text is contextually related "
-                    "to the skill but doesn't use the exact term."
+
+        col_jd_sk, col_cand_sk = st.columns(2)
+
+        with col_jd_sk:
+            st.markdown("**Required by JD**")
+            if jd_info["skills_and_tools"]:
+                st.markdown(
+                    _skill_tags_html(
+                        score_info["matched_skills"],
+                        score_info.get("semantic_skills", []),
+                        score_info["missing_skills"],
+                    ),
+                    unsafe_allow_html=True,
                 )
-        else:
-            st.info("No specific tools/skills detected in the JD.")
+                m = len(score_info["matched_skills"])
+                s = len(score_info.get("semantic_skills", []))
+                g = len(score_info["missing_skills"])
+                st.caption(
+                    f"✅ {m} exact &nbsp;·&nbsp; ≈ {s} semantic &nbsp;·&nbsp; "
+                    f"❌ {g} missing"
+                )
+            else:
+                st.caption("No specific tools detected in JD.")
+            if jd_info.get("unknown_tools"):
+                st.markdown("*Also in JD (unlisted tools):*")
+                st.markdown(
+                    " ".join(
+                        f'<span style="background:#2563eb18;color:#2563eb;'
+                        f'border:1px solid #2563eb44;padding:3px 9px;border-radius:20px;'
+                        f'margin:2px;display:inline-block;font-size:.78rem;">{t}</span>'
+                        for t in jd_info["unknown_tools"]
+                    ),
+                    unsafe_allow_html=True,
+                )
 
-        if jd_info.get("unknown_tools"):
-            st.markdown("**Also detected in JD (not in core vocabulary):**")
-            st.markdown(
-                " ".join(
-                    f'<span style="background:#2563eb18;color:#2563eb;border:1px solid #2563eb44;'
-                    f'padding:4px 10px;border-radius:20px;margin:3px;display:inline-block;'
-                    f'font-size:.78rem;">{t}</span>'
-                    for t in jd_info["unknown_tools"]
-                ),
-                unsafe_allow_html=True,
-            )
+        with col_cand_sk:
+            st.markdown("**Detected in candidate**")
+            if candidate_hard_skills:
+                # Skills the candidate has that ARE in JD vs extras they bring
+                jd_set = set(jd_info["skills_and_tools"])
+                in_jd = [s for s in candidate_hard_skills if s in jd_set]
+                extra = [s for s in candidate_hard_skills if s not in jd_set]
+                if in_jd:
+                    st.markdown(_candidate_skill_tags_html(in_jd), unsafe_allow_html=True)
+                if extra:
+                    st.markdown(
+                        "<span style='font-size:.78rem;color:#888;'>Also brings:</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        _candidate_skill_tags_html(extra, extra=True),
+                        unsafe_allow_html=True,
+                    )
+                st.caption(f"{len(candidate_hard_skills)} skills detected in resume")
+            else:
+                st.caption("No tools from core vocabulary detected in resume.")
 
-        if jd_info.get("soft_skills"):
-            st.markdown("**Soft skills in JD:**")
-            st.markdown(_soft_tags_html(jd_info["soft_skills"]), unsafe_allow_html=True)
+        # ── Soft Skills ────────────────────────────────────────────────────────
+        st.divider()
+        st.subheader("Soft Skills")
+        col_jd_soft, col_cand_soft = st.columns(2)
+
+        with col_jd_soft:
+            jd_soft = jd_info.get("soft_skills", [])
+            st.markdown("**Required by JD**")
+            if jd_soft:
+                st.markdown(
+                    _soft_skill_coverage_html(jd_soft, candidate_text),
+                    unsafe_allow_html=True,
+                )
+                covered = sum(
+                    1 for sk in jd_soft
+                    if re.search(r"\b" + re.escape(sk) + r"\b",
+                                 candidate_text, re.IGNORECASE)
+                )
+                st.caption(f"✅ {covered} of {len(jd_soft)} JD soft skills found in resume")
+            else:
+                st.caption("No soft skills detected in JD.")
+
+        with col_cand_soft:
+            st.markdown("**Detected in candidate**")
+            if candidate_soft_skills:
+                jd_soft_set = set(jd_info.get("soft_skills", []))
+                soft_in_jd  = [s for s in candidate_soft_skills if s in jd_soft_set]
+                soft_extra  = [s for s in candidate_soft_skills if s not in jd_soft_set]
+                if soft_in_jd:
+                    st.markdown(_candidate_skill_tags_html(soft_in_jd), unsafe_allow_html=True)
+                if soft_extra:
+                    st.markdown(
+                        "<span style='font-size:.78rem;color:#888;'>Additional strengths:</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        _candidate_skill_tags_html(soft_extra, extra=True),
+                        unsafe_allow_html=True,
+                    )
+                st.caption(f"{len(candidate_soft_skills)} soft skills detected in resume")
+            else:
+                st.caption("No soft skills from vocabulary detected in resume.")
 
         # ── Score breakdown ────────────────────────────────────────────────────
         st.divider()

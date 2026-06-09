@@ -112,19 +112,34 @@ SOFT_SKILLS: list[str] = [
     # Communication
     "communication", "stakeholder management", "presentation skills",
     "written communication", "verbal communication", "public speaking",
-    # Leadership
+    "report writing", "documentation", "storytelling", "active listening",
+    # Leadership & Management
     "leadership", "mentoring", "coaching", "people management", "team management",
-    # Analytical
+    "decision making", "strategic thinking", "change management", "conflict resolution",
+    "performance management", "talent development", "delegation",
+    # Analytical & Problem Solving
     "problem solving", "analytical thinking", "critical thinking",
-    "attention to detail", "data-driven",
-    # Collaboration
+    "attention to detail", "data-driven", "research", "root cause analysis",
+    "creative thinking", "innovation", "continuous improvement",
+    # Collaboration & Interpersonal
     "collaboration", "teamwork", "cross-functional", "interpersonal skills",
+    "relationship management", "relationship building", "client management",
+    "client relationship", "customer service", "stakeholder engagement",
+    "empathy", "emotional intelligence", "cultural awareness",
     # Project & Delivery
     "project management", "planning", "prioritization", "time management",
+    "organisation", "organized", "multitasking", "deadline management",
+    "budget management", "risk management", "quality assurance",
     # Adaptability & Drive
     "adaptability", "self-starter", "initiative", "ownership", "fast-paced",
-    # Influence
-    "stakeholder", "influencing", "negotiation",
+    "resilience", "accountability", "results-driven", "proactive",
+    "work ethic", "self-motivated", "detail-oriented",
+    # Influence & Commercial
+    "influencing", "negotiation", "persuasion", "stakeholder",
+    "business acumen", "commercial awareness", "sales", "customer focus",
+    # Domain-neutral professional skills
+    "compliance", "facilitation", "training", "onboarding", "process improvement",
+    "policy development", "reporting", "coordination", "scheduling",
 ]
 
 INDUSTRY_SIGNALS: dict[str, list[str]] = {
