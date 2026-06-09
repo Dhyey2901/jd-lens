@@ -59,20 +59,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
+st.html("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ── Global font ── */
   html, body, [class*="css"], .stMarkdown, .stTextArea textarea,
   .stTextInput input, .stSelectbox, button { font-family: 'Inter', sans-serif !important; }
-
-  /* ── Headings ── */
   h1 { font-weight: 700 !important; letter-spacing: -0.5px !important; }
   h2, h3 { font-weight: 600 !important; letter-spacing: -0.3px !important; }
-
-  /* ── Section cards — wrap heavy content blocks ── */
   .jdl-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
@@ -81,31 +76,19 @@ st.markdown("""
     margin: 8px 0 16px;
     box-shadow: 0 1px 3px rgba(0,0,0,.04);
   }
-
-  /* ── Subtle dividers (replace the full-width heavy lines) ── */
   hr { border-color: #E2E8F0 !important; margin: 20px 0 !important; }
-
-  /* ── Metric labels — smaller, muted ── */
   [data-testid="stMetricLabel"] { font-size: .78rem !important; color: #64748B !important; }
   [data-testid="stMetricValue"] { font-size: 1.15rem !important; font-weight: 600 !important; }
-
-  /* ── Primary button ── */
   .stButton > button[kind="primary"] {
     font-weight: 600 !important;
     letter-spacing: .01em !important;
     border-radius: 8px !important;
   }
-
-  /* ── Tabs — bolder active label ── */
   [data-baseweb="tab"] { font-weight: 500 !important; }
-
-  /* ── Skill pill hover — subtle lift ── */
   span[style*="border-radius:20px"]:hover { opacity: .85; }
-
-  /* ── Remove default top padding on main block ── */
   .block-container { padding-top: 2rem !important; }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 # ── Model loading (cached across sessions) ─────────────────────────────────────
 
