@@ -358,7 +358,7 @@ with tab_analyse:
 
     analyse = st.button("Analyse ✨", type="primary", use_container_width=True)
 
-    MAX_CHARS = 12_000
+    MAX_CHARS = 20_000
     if analyse:
         if not jd_text.strip() or not candidate_text.strip():
             st.error("Please provide both a job description and a candidate profile.")
