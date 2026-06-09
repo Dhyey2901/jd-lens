@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _SEMANTIC_SKILL_THRESHOLD = 0.52
 
 # Top N JD keywords to check for presence in candidate text.
-_KEYWORD_TOP_N = 20
+_KEYWORD_TOP_N = 30
 
 # Common resume section header patterns.
 _SECTION_HEADER_RE = re.compile(
@@ -176,49 +176,47 @@ _JD_BOILERPLATE = frozenset({
     "excellent", "strong", "ability", "skills", "skill", "knowledge",
     "understanding", "familiarity", "plus", "bonus", "preferred", "desired",
     "ideal", "candidate", "candidates", "minimum", "least", "year", "month",
-    "mentor", "mentoring", "build", "builds", "building", "develop", "design",
-    "lead", "leading", "bachelor", "master", "science", "scientist", "scientists",
-    "senior", "junior", "engineer", "engineers", "platform", "presentations",
-    "production", "models",
+    "build", "builds", "building", "develop", "design",
+    "bachelor", "master", "science", "scientist", "scientists",
+    "senior", "junior", "engineer", "engineers",
 })
 
 
-def _keyword_overlap_score(jd_text: str, candidate_text: str, top_n: int = _KEYWORD_TOP_N) -> float:
-    """Extract top N technical JD keywords and check presence in candidate.
+def _extract_jd_keywords(jd_text: str, top_n: int = _KEYWORD_TOP_N) -> list[str]:
+    """Extract the most distinctive keywords and phrases from JD text.
 
-    Uses unigrams + custom boilerplate stop-words so CountVectorizer surfaces
-    actual skill/tool terms rather than JD template language.
-    Both texts should already have alias normalisation applied before calling.
+    Unigrams + bigrams so multi-word skills like 'stakeholder management'
+    and 'machine learning' are captured alongside single-word tool names.
+    Custom boilerplate stop-words remove JD template noise first.
     """
     jd_clean = re.sub(r"[-•–\n]+", " ", jd_text).strip()
-    stop_words = list(_JD_BOILERPLATE)
-
     try:
         vec = CountVectorizer(
-            ngram_range=(1, 1),
-            stop_words=stop_words,
+            ngram_range=(1, 2),
+            stop_words=list(_JD_BOILERPLATE),
             max_features=top_n,
             token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z0-9+#.\-]{2,}\b",
         )
         vec.fit([jd_clean])
-        keywords = vec.get_feature_names_out()
+        return list(vec.get_feature_names_out())
     except ValueError:
-        return 0.0
+        return []
 
+
+def _keyword_overlap_score(jd_text: str, candidate_text: str, top_n: int = _KEYWORD_TOP_N) -> float:
+    """Fraction of top JD keywords/phrases present in candidate text."""
+    keywords = _extract_jd_keywords(jd_text, top_n)
+    if not keywords:
+        return 0.0
     candidate_lower = candidate_text.lower()
     hits = sum(1 for kw in keywords if re.search(r"\b" + re.escape(kw) + r"\b", candidate_lower))
-    score = hits / max(len(keywords), 1)
+    score = hits / len(keywords)
     logger.debug(
         "Keyword overlap: %d/%d hit — matched=%s",
         hits, len(keywords),
         [kw for kw in keywords if re.search(r"\b" + re.escape(kw) + r"\b", candidate_lower)],
     )
     return score
-
-
-def _tokenize(text: str) -> set[str]:
-    # (?<!\w) instead of \b so special-char tokens like c++ and node.js match correctly.
-    return set(re.findall(r"(?<!\w)[a-z][a-z0-9+#.\-]+", text.lower()))
 
 
 # ── Skill classification ───────────────────────────────────────────────────────
@@ -292,10 +290,6 @@ def _classify_skills(
             missing.append(skill)
 
     return exact, semantic, missing
-
-
-def _tokenize_meaningful(tokens: set[str]) -> list[str]:
-    return sorted(t for t in tokens if len(t) > 2 and not t.isdigit())
 
 
 def _bullet_alignment_scores(
@@ -452,9 +446,6 @@ def compute_fit_score(
             + SCORE_WEIGHTS["skill"] * skill_rate
         )
 
-    jd_tokens = _tokenize(jd_text)
-    candidate_tokens = _tokenize(candidate_clean)
-
     logger.info(
         "Fit score: %.1f%% (sem=%.1f kw=%.1f skill=%.1f) | "
         "exact=%d semantic=%d missing=%d",
@@ -462,6 +453,14 @@ def compute_fit_score(
         sem_score * 100, combined_kw * 100, skill_rate * 100,
         len(exact), len(semantic_match), len(missing),
     )
+
+    # Important JD keywords (unigrams + bigrams, boilerplate-filtered) split by
+    # whether they appear in the candidate text — much more actionable than raw
+    # token set intersection which surfaces noisy common words.
+    _jd_kw = _extract_jd_keywords(jd_text)
+    _cand_lower = candidate_clean.lower()
+    matched_kw = [kw for kw in _jd_kw if re.search(r"\b" + re.escape(kw) + r"\b", _cand_lower)]
+    gap_kw = [kw for kw in _jd_kw if not re.search(r"\b" + re.escape(kw) + r"\b", _cand_lower)]
 
     top_bullets = _bullet_alignment_scores(jd_text, candidate_clean, model)
 
@@ -475,8 +474,8 @@ def compute_fit_score(
         "matched_skills": exact,
         "semantic_skills": semantic_match,
         "missing_skills": missing,
-        "matched_keywords": _tokenize_meaningful(jd_tokens & candidate_tokens)[:60],
-        "gap_keywords": _tokenize_meaningful(jd_tokens - candidate_tokens)[:60],
+        "matched_keywords": matched_kw,
+        "gap_keywords": gap_kw,
         "top_bullets": top_bullets,
     }
 

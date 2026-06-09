@@ -1,30 +1,35 @@
 """Unit tests for scorer.py — pure logic tests, no model calls."""
 import pytest
 
-from scorer import _detect_resume_sections, _get_skills_section, _tfidf_similarity, _tokenize
+from scorer import _detect_resume_sections, _extract_jd_keywords, _get_skills_section, _tfidf_similarity
 
 
-class TestTokenize:
-    def test_lowercases(self):
-        tokens = _tokenize("Python AWS Docker")
-        assert "python" in tokens
-        assert "aws" in tokens
+class TestExtractJdKeywords:
+    def test_returns_list(self):
+        kws = _extract_jd_keywords("We need Python, SQL, and AWS experience.")
+        assert isinstance(kws, list)
 
-    def test_filters_short(self):
-        # _tokenize drops single-char tokens only; len>2 filtering is in compute_fit_score
-        tokens = _tokenize("I am a go developer")
-        assert "i" not in tokens
-        assert "a" not in tokens
+    def test_captures_single_keywords(self):
+        kws = _extract_jd_keywords("Proficiency in Python and SQL required. AWS knowledge a plus.")
+        kws_lower = [k.lower() for k in kws]
+        assert any("python" in k for k in kws_lower)
 
-    def test_filters_pure_digits(self):
-        tokens = _tokenize("2024 experience required")
-        assert "2024" not in tokens
+    def test_captures_bigrams(self):
+        jd = "Strong stakeholder management and problem solving skills required."
+        kws = _extract_jd_keywords(jd)
+        kws_lower = [k.lower() for k in kws]
+        assert any("stakeholder management" in k or "problem solving" in k for k in kws_lower)
 
-    def test_handles_special_chars(self):
-        # \b fails after non-word chars like + and # — regex uses (?<!\w) instead
-        tokens = _tokenize("working with c++ and node.js daily")
-        assert "c++" in tokens
-        assert "node.js" in tokens
+    def test_filters_boilerplate(self):
+        jd = "Required experience with SQL. We are seeking a senior engineer with degree."
+        kws = _extract_jd_keywords(jd)
+        kws_lower = [k.lower() for k in kws]
+        # "required", "seeking", "senior", "engineer", "degree" are boilerplate
+        assert "required" not in kws_lower
+        assert "seeking" not in kws_lower
+
+    def test_empty_text_returns_empty(self):
+        assert _extract_jd_keywords("") == []
 
 
 class TestDetectResumeSections:

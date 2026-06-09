@@ -10,7 +10,7 @@ import streamlit as st
 
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, ZERO_SHOT_MODEL
-from extractor import extract_jd, extract_skills_and_tools, extract_soft_skills
+from extractor import extract_jd, extract_skills_and_tools, extract_soft_skills, extract_unknown_tools
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from signals import compute_hiring_signals, generate_prediction
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
@@ -383,8 +383,11 @@ with tab_analyse:
                 embedding_model=embedder,
             )
 
-        # Extract skills/soft-skills directly from the candidate resume
+        # Extract skills/soft-skills directly from the candidate resume.
+        # unknown_tools catches context-pattern mentions ("proficiency in Workday")
+        # that aren't in KNOWN_TOOLS — critical for non-tech domains.
         candidate_hard_skills = extract_skills_and_tools(candidate_text)
+        candidate_unknown_skills = extract_unknown_tools(candidate_text)
         candidate_soft_skills = extract_soft_skills(candidate_text)
 
         # Hiring signals — rule-based, zero model overhead
@@ -548,22 +551,31 @@ with tab_analyse:
             else:
                 st.caption("No specific tools detected in JD.")
             if jd_info.get("unknown_tools"):
-                st.markdown("*Also in JD (unlisted tools):*")
                 st.markdown(
-                    " ".join(
-                        f'<span style="background:#2563eb18;color:#2563eb;'
-                        f'border:1px solid #2563eb44;padding:3px 9px;border-radius:20px;'
-                        f'margin:2px;display:inline-block;font-size:.78rem;">{t}</span>'
-                        for t in jd_info["unknown_tools"]
-                    ),
+                    "<span style='font-size:.78rem;color:#888;'>Also in JD (unlisted):</span>",
                     unsafe_allow_html=True,
                 )
+                cand_text_lower = candidate_text.lower()
+                unk_tags = []
+                for t in jd_info["unknown_tools"]:
+                    has = bool(re.search(r"\b" + re.escape(t) + r"\b", cand_text_lower))
+                    bg = "#10b98118" if has else "#ef444418"
+                    fg = "#059669" if has else "#dc2626"
+                    border = "#10b98144" if has else "#ef444444"
+                    icon = "✓" if has else "✗"
+                    unk_tags.append(
+                        f'<span style="background:{bg};color:{fg};border:1px solid {border};'
+                        f'padding:3px 9px;border-radius:20px;margin:2px;'
+                        f'display:inline-block;font-size:.78rem;">{icon} {t}</span>'
+                    )
+                st.markdown(" ".join(unk_tags), unsafe_allow_html=True)
 
         with col_cand_sk:
             st.markdown("**Detected in candidate**")
-            if candidate_hard_skills:
-                # Skills the candidate has that ARE in JD vs extras they bring
+            total_cand = len(candidate_hard_skills) + len(candidate_unknown_skills)
+            if candidate_hard_skills or candidate_unknown_skills:
                 jd_set = set(jd_info["skills_and_tools"])
+                jd_unk_set = set(jd_info.get("unknown_tools", []))
                 in_jd = [s for s in candidate_hard_skills if s in jd_set]
                 extra = [s for s in candidate_hard_skills if s not in jd_set]
                 if in_jd:
@@ -577,9 +589,23 @@ with tab_analyse:
                         _candidate_skill_tags_html(extra, extra=True),
                         unsafe_allow_html=True,
                     )
-                st.caption(f"{len(candidate_hard_skills)} skills detected in resume")
+                if candidate_unknown_skills:
+                    st.markdown(
+                        "<span style='font-size:.78rem;color:#888;'>Other tools mentioned:</span>",
+                        unsafe_allow_html=True,
+                    )
+                    unk_in_jd = [t for t in candidate_unknown_skills if t in jd_unk_set]
+                    unk_extra = [t for t in candidate_unknown_skills if t not in jd_unk_set]
+                    if unk_in_jd:
+                        st.markdown(_candidate_skill_tags_html(unk_in_jd), unsafe_allow_html=True)
+                    if unk_extra:
+                        st.markdown(
+                            _candidate_skill_tags_html(unk_extra, extra=True),
+                            unsafe_allow_html=True,
+                        )
+                st.caption(f"{total_cand} skills detected in resume")
             else:
-                st.caption("No tools from core vocabulary detected in resume.")
+                st.caption("No skills detected in resume.")
 
         # ── Soft Skills ────────────────────────────────────────────────────────
         st.divider()
@@ -623,6 +649,44 @@ with tab_analyse:
                 st.caption(f"{len(candidate_soft_skills)} soft skills detected in resume")
             else:
                 st.caption("No soft skills from vocabulary detected in resume.")
+
+        # ── Keyword Analysis ───────────────────────────────────────────────────
+        st.divider()
+        st.subheader("Keyword Analysis")
+        matched_kw = score_info.get("matched_keywords", [])
+        gap_kw = score_info.get("gap_keywords", [])
+        if matched_kw or gap_kw:
+            kw_col1, kw_col2 = st.columns(2)
+            with kw_col1:
+                st.markdown("**✅ Found in resume**")
+                if matched_kw:
+                    st.markdown(
+                        " ".join(
+                            f'<span style="background:#10b98118;color:#059669;'
+                            f'border:1px solid #10b98144;padding:3px 9px;border-radius:20px;'
+                            f'margin:2px;display:inline-block;font-size:.78rem;">{kw}</span>'
+                            for kw in matched_kw
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("No JD keywords found in resume.")
+            with kw_col2:
+                st.markdown("**❌ Missing from resume**")
+                if gap_kw:
+                    st.markdown(
+                        " ".join(
+                            f'<span style="background:#ef444418;color:#dc2626;'
+                            f'border:1px solid #ef444444;padding:3px 9px;border-radius:20px;'
+                            f'margin:2px;display:inline-block;font-size:.78rem;">{kw}</span>'
+                            for kw in gap_kw
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("All key JD terms found in resume.")
+        else:
+            st.caption("Keyword analysis not available.")
 
         # ── Score breakdown ────────────────────────────────────────────────────
         st.divider()
