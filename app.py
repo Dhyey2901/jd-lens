@@ -59,36 +59,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.html("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  html, body, [class*="css"], .stMarkdown, .stTextArea textarea,
-  .stTextInput input, .stSelectbox, button { font-family: 'Inter', sans-serif !important; }
-  h1 { font-weight: 700 !important; letter-spacing: -0.5px !important; }
-  h2, h3 { font-weight: 600 !important; letter-spacing: -0.3px !important; }
-  .jdl-card {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin: 8px 0 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  }
-  hr { border-color: #E2E8F0 !important; margin: 20px 0 !important; }
-  [data-testid="stMetricLabel"] { font-size: .78rem !important; color: #64748B !important; }
-  [data-testid="stMetricValue"] { font-size: 1.15rem !important; font-weight: 600 !important; }
-  .stButton > button[kind="primary"] {
-    font-weight: 600 !important;
-    letter-spacing: .01em !important;
-    border-radius: 8px !important;
-  }
-  [data-baseweb="tab"] { font-weight: 500 !important; }
-  span[style*="border-radius:20px"]:hover { opacity: .85; }
-  .block-container { padding-top: 2rem !important; }
-</style>
-""")
+st.html('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">')
+
+st.markdown("""<style>
+html,body,[class*="css"],.stMarkdown,.stTextArea textarea,.stTextInput input,.stSelectbox,button{font-family:'Inter',sans-serif!important}
+h1{font-weight:700!important;letter-spacing:-.5px!important}
+h2,h3{font-weight:600!important;letter-spacing:-.3px!important}
+hr{border-color:#E2E8F0!important;margin:20px 0!important}
+[data-testid="stMetricLabel"]{font-size:.78rem!important;color:#64748B!important}
+[data-testid="stMetricValue"]{font-size:1.15rem!important;font-weight:600!important}
+.stButton>button[kind="primary"]{font-weight:600!important;letter-spacing:.01em!important;border-radius:8px!important}
+[data-baseweb="tab"]{font-weight:500!important}
+.block-container{padding-top:2rem!important}
+</style>""", unsafe_allow_html=True)
 
 # ── Model loading (cached across sessions) ─────────────────────────────────────
 
