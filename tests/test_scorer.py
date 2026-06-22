@@ -1,7 +1,12 @@
 """Unit tests for scorer.py — pure logic tests, no model calls."""
 import pytest
 
-from scorer import _detect_resume_sections, _extract_jd_keywords, _get_skills_section, _tfidf_similarity
+from scorer import (
+    _detect_resume_sections,
+    _extract_jd_keywords,
+    _get_skills_section,
+    _tfidf_similarity,
+)
 
 
 class TestExtractJdKeywords:

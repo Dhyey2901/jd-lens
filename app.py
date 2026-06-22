@@ -10,7 +10,12 @@ import streamlit as st
 
 from classifier import classify_jd, get_pipeline
 from config import EMBEDDING_MODEL, MAX_CHARS, MAX_FILE_SIZE_MB, MIN_RESUME_WORDS, ZERO_SHOT_MODEL
-from extractor import extract_jd, extract_skills_and_tools, extract_soft_skills, extract_unknown_tools
+from extractor import (
+    extract_jd,
+    extract_skills_and_tools,
+    extract_soft_skills,
+    extract_unknown_tools,
+)
 from scorer import compute_fit_score, get_cross_encoder, get_embedding_model
 from signals import compute_hiring_signals, generate_prediction
 from utils import SUPPORTED_LABEL, SUPPORTED_TYPES, extract_text_from_file
