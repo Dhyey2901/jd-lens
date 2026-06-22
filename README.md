@@ -49,7 +49,7 @@ Four-quadrant verdict from (JD-Match × Hiring Signal): **Strong Candidate / Ove
 | --- | --- |
 | **Scoring** | 3-tier hybrid · JD-adaptive dimension weights · section-aware skill weighting |
 | **Signals** | 7-dimension Hiring Signal Score · role-type detection (6 categories) · four-quadrant prediction |
-| **Extraction** | 138 known tools · context-phrase unknown tool detection (JD + resume) · 55-term soft skill vocab |
+| **Extraction** | 147 known tools · context-phrase unknown tool detection (JD + resume) · 85-term soft skill vocab |
 | **Alignment** | Top-3 resume bullets ranked against JD · each bullet matched to closest JD requirement |
 | **Validation** | 5 MB file cap · 30-word minimum · 20k char limit · scanned-PDF warning |
 | **API** | FastAPI `/analyse` + `/health` · SHA-256 result cache |
@@ -66,7 +66,7 @@ jd-lens/
 ├── scorer.py       Hybrid scorer — semantic + TF-IDF + skill match + cache
 ├── signals.py      Hiring Signal Score — 7 dimensions, role detection, prediction
 ├── extractor.py    JD signal extraction, section-aware parsing, unknown tool detection
-├── config.py       Models, weights, KNOWN_TOOLS (138), SOFT_SKILLS (55), limits
+├── config.py       Models, weights, KNOWN_TOOLS (147), SOFT_SKILLS (85), limits
 ├── utils.py        Multi-format document extraction (PDF, DOCX, TXT)
 ├── tests/          126 unit tests across 4 test files
 └── eval/           Ground-truth eval harness (5 gold pairs, make eval-fast)

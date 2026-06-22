@@ -207,7 +207,7 @@ KNOWN_TOOLS: list[str] = [
     "agile", "scrum", "ci/cd", "linux", "bash", "shell", "sql", "nosql",
     # Modern data / ML tooling (post-2022)
     "duckdb", "polars", "ray", "modal", "wandb", "prefect", "dagster",
-    "great expectations", "dbt", "metaflow", "bentoml", "vllm", "ollama",
+    "great expectations", "metaflow", "bentoml", "vllm", "ollama",
     "lancedb", "qdrant", "milvus", "llamaindex", "crewai", "autogen",
     "feast", "tecton", "vertex ai", "sagemaker", "databricks",
 ]
