@@ -101,5 +101,5 @@ make api           # FastAPI on http://localhost:8000
 ---
 
 <div align="center">
-  <i>Built by <a href="https://github.com/Dhyey2901">Dhyey Vyas</a> · MSc Data Science @ RMIT</i>
+  <i>Built by <a href="https://github.com/Dhyey2901">Dhyey Vyas</a></i>
 </div>
